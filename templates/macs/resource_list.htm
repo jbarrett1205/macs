@@ -11,7 +11,7 @@
 </ul>
 
 {% if resources %}
-	<table class="fullwidth padded">
+	<table class="padded">
 	<tr><th>ID</th><th>Name</th><th>Description</th><th>&nbsp;</th></tr>
 	{% for r in resources %}
 		<tr class="{% cycle 'odd' 'even' %}"><td><a href="{% url 'macs.views.resource_view' r.id %}">{{ r.id }}</a></td><td>{{ r.name }}</td><td>{{ r.description }}</td>

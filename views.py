@@ -548,11 +548,11 @@ def schedule_show(request):
     "show the current schedule"
     today = datetime.date.today()
     yesterday = today - datetime.timedelta(days=1)
-    thirty_days_future = today + datetime.timedelta(days=31)
+    future_window = today + datetime.timedelta(days=91)
     
     context = macs_default_context({
         'daily_schedule':DailySchedule.objects.all(),
-        'upcoming_exceptions':ScheduleException.objects.filter(date__gt=yesterday).filter(date__lt=thirty_days_future),
+        'upcoming_exceptions':ScheduleException.objects.filter(date__gt=yesterday).filter(date__lt=future_window),
         })
 
     return render(request,'macs/schedule_show.htm',context)
