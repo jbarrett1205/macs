@@ -1,0 +1,36 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h2>Member Info</h2>
+
+<table class="padded">
+<tr class="odd"><th>ID</th><td>{{ member.id }}</td></tr>
+<tr class="even"><th>First Name</th><td>{{ member.first_name }}</td></tr>
+<tr class="odd"><th>Last Name</th><td>{{ member.last_name }}</td></tr>
+<tr class="even"><th>User ID</th><td>{{ member.username }}</td></tr>
+<tr class="odd"><th>Email</th><td>{{ member.email }}</td></tr>
+<tr class="even"><th>Expires</th><td>{{ member.expires }}</td></tr>
+</table>
+
+<p><span class="boldface">Comments:</span><br />
+<textarea rows="8" cols="70" readonly="readonly" disabled="disabled">{{ member.comments }}</textarea>
+</p>
+
+<h2>Resources</h2>
+
+<table class="padded">
+   <tr><th>ID</th><th>Name</th><th>Description</th></tr>
+{% for r in member.resources.all %}
+   <tr class="{% cycle 'odd' 'even' %}"><td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.description }}</td></tr>
+{% endfor %}
+</table>
+
+<h2>Actions</h2>
+
+<ul>
+  <li><a href="{% url 'macs.views.member_edit' member.id %}">Edit member information</a></li>
+  <li><a href="{% url 'macs.views.add_resource_access' member.id %}">Add new resources</a></li>  
+</ul>
+
+{% endblock content %}

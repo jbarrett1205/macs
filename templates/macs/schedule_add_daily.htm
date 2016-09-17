@@ -1,0 +1,26 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Add a new daily schedule window</h1>
+
+<p>There can be as many daily schedule windows for a given day as you want, however it's generally
+practical to have only 1 or 2</p>
+
+<p>The &quot;Start time&quot; and &quotEnd time&quot; must be entered in 24-hour format (e.g. 7:00, 16:30, 18:00, etc).</p>
+
+<form method="post">
+{% csrf_token %}
+
+<p class="errors">{{ form.non_field_errors }}</p>
+
+<table class="padded">
+<tr><th>{{ form.day.label }}</th><td>{{ form.day }}</td><td>{{ form.day.errors }}</td></tr>
+<tr><th>{{ form.start_time.label }}</th><td>{{ form.start_time }}</td><td>{{ form.start_time.errors }} <span style="font-style:italic;">e.g. 8:00</span></td></tr>
+<tr><th>{{ form.end_time.label }}</th><td>{{ form.end_time }}</td><td>{{ form.end_time.errors }} <span style="font-style:italic;">e.g. 23:00</span></td></tr>
+</table>
+
+<p><input type="submit" value="Add" /></p>
+</form>
+
+{% endblock content %}

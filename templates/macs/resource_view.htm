@@ -1,0 +1,26 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Resource Info</h1>
+
+<table class="padded">
+<tr class="odd"><th>ID</th><td>{{ resource.id }}</td></tr>
+<tr class="even"><th>Name</th><td>{{ resource.name }}</td></tr>
+<tr class="odd"><th>Description</th><td>{{ resource.description }}</td></tr>
+<tr class="even"><th>Secret Key</th><td>{{ resource.secret }}</td></tr>
+<tr class="odd"><th>Cost Per Hour</th><td>{{ resource.cost_per_hour }}</td></tr>
+
+</table>
+
+<h2>Members with Access</h2>
+
+<table class="padded">
+  <tr><th>Last Name</th><th>First Name</th><th>Trainer</th><th>When Granted</th><th>Comment</th></tr>
+  {% for m in members_allowed %}
+  <tr class="{% cycle 'odd' 'even' %}"><td>{{ m.member.last_name }}</td><td>{{ m.member.first_name }}</td>
+     <td>{{ m.trainer }}</td><td>{{ m.timestamp }}</td><td>{{ m.comment|default:"&nbsp;" }}</td></tr>
+  {% endfor %}
+</table>
+
+{% endblock content %}

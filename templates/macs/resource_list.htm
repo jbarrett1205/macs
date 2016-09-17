@@ -1,0 +1,27 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Resource Listing</h1>
+
+<p>Resources are used to provide access to various Makerspace assets.</p>
+
+<ul>
+  <li><a href="{% url 'macs.views.resource_create' %}">Create a new resource</a></li>
+</ul>
+
+{% if resources %}
+	<table class="fullwidth padded">
+	<tr><th>ID</th><th>Name</th><th>Description</th><th>&nbsp;</th></tr>
+	{% for r in resources %}
+		<tr class="{% cycle 'odd' 'even' %}"><td><a href="{% url 'macs.views.resource_view' r.id %}">{{ r.id }}</a></td><td>{{ r.name }}</td><td>{{ r.description }}</td>
+		   <td><a href="{% url 'macs.views.resource_edit' r.id %}">edit</a></td>
+		   </tr>
+	{% endfor %} 
+	</table>
+
+{% else %}
+  <p class="note">No resources yet.</p>
+{% endif %}
+
+{% endblock content %}

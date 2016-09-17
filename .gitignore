@@ -1,0 +1,8 @@
+# ignore compile/cache debug files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ignore settings.py since it could have secret stuff in it
+settings.py
+

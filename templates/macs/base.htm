@@ -1,0 +1,125 @@
+<!DOCTYPE html">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Expires" content="31 Dec 2000 00:00:00 GMT" />
+<!-- fix for IE9 stupid compatibility mode issues with jQuery -->
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+<link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/macs.css" />
+<script type="text/javascript" src="{{STATIC_URL}}js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/jquery-ui-1.10.4.custom.min.js"></script>
+<link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/overcast/jquery-ui-1.10.4.custom.css" />
+{% block htmlhead %}{# placeholder for additional HTML header information to be added #}{% endblock htmlhead %}
+<title>{% block titlebase %}MACS {% endblock titlebase %}{% block titletext %}{% endblock titletext %}</title>
+</head>
+
+<body>
+{% block bodyjs %}{# placeholder for javascript to be added to the body #}{% endblock bodyjs %}
+
+<script type="text/javascript">
+jQuery(document).ready( function($) {
+    $("ul.navbar li").hover(function(){
+        $(this).addClass("hover");
+        $('ul:first',this).css('visibility', 'visible');
+    
+    }, function(){
+        $(this).removeClass("hover");
+        $('ul:first',this).css('visibility', 'hidden');
+    });
+    $("ul.navbar li ul li:has(ul)").find("a:first").append(" &raquo; ");
+    if( !$.trim($('#content-banner').html()) ) {
+        $('#content-banner').hide()
+    }
+});
+</script>
+
+<!-- MAIN PAGE CONTAINER -->
+<div id="pageContainer">
+
+<!-- HEADER SECTION -->
+<div id="contentHeader">
+{% block header %}
+<div id="headerBar">
+  <div id="navigationBar">
+
+	  <div id="loginPad">
+		 {% if user.is_authenticated %}
+			Hello, {{ user.get_full_name }}. (<a href="{% url 'logout' %}?{{ redirect_field_name }}={% url 'macs_home' %}">Logout</a>)
+		 {% else %}
+			<a href="{% url 'login' %}?{{ redirect_field_name }}={{ request.path|urlencode }}">Login</a>
+		 {% endif %}
+	  </div>
+
+
+  <ul class="navbar">
+      <li>
+	    <a href="#">Members</a>
+        <ul>
+          <li><a href="{% url 'macs.views.member_create' %}">Create</a></li>
+          <li><a href="{% url 'macs.views.member_list' %}">List</a></li>
+          <!-- <li><a href="">Search ...</a></li> -->
+        </ul>
+	  </li><li>
+        <a href="#">Resources</a>
+        <ul>
+          <li><a href="{% url 'macs.views.resource_create' %}">Create</a></li>
+          <li><a href="{% url 'macs.views.resource_list' %}">List</a></li>
+        </ul>
+      </li><li>
+        <a href="#">Reports</a>
+        <ul>
+          <li><a href="{% url 'macs.views.report_access_log' %}">Access Log</a></li>
+        </ul>
+	  </li><li>
+	    <a href="{% url 'macs.views.schedule_show' %}">Schedule</a>
+	  </li>
+    </ul>
+	
+	<div class="clearfix">
+	
+  </div>
+    
+</div>
+{% endblock header %}
+</div><!-- end of HEADER SECTION -->
+
+
+<!-- MAIN CONTENT SECTION -->
+<div id="contentContainer">
+  <div id="javascript-is-disabled">
+    Javascript is disabled in your web browser - or you are using a web browser from the 1990s. This site will not work correctly with Javascript disabled.
+  </div>
+  <script type="text/javascript">
+  $('#javascript-is-disabled').hide()
+  </script>
+
+  
+  <div id="content-banner" style="border:2px solid #00b000;color:#008000;margin:1em;padding:0.3em;font-size:120%;font-weight:bold;">{{ page_banner_content|safe }}</div>
+  
+  <!-- Main Content Area -->
+  <div id="contentMain">
+  
+{% block messages %}
+    <div id="messageArea">
+       {% for m in messages %}
+          <p{% if m.tags %} class="{{ m.tags }}"{% endif %}>{{ m }}</p>
+       {% endfor %}
+    </div>
+{% endblock messages %}
+
+{% block content %}<p>Content goes here.</p>{% endblock content %}
+  </div><!-- end of Main Content Area -->
+  
+</div><!-- end of MAIN CONTENT SECTION -->
+
+<!-- FOOTER SECTION -->
+<div id="contentFooter">
+{% block footer %}
+{% endblock footer %}
+</div><!-- end of FOOTER SECTION -->
+
+</div><!-- end of MAIN PAGE CONTAINER -->
+
+</body>
+</html>

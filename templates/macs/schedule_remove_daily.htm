@@ -1,0 +1,21 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Delete a daily schedule window</h1>
+
+<p class="warning">Are you sure you want to delete this daily schedule window?</p>
+
+<table class="padded">
+<tr><th>Day</th><td>{{ schedule.get_day_display }}</td></tr>
+<tr><th>Start Time</th><td>{{ schedule.start_time }}</td></tr>
+<tr><th>End Time</th><td>{{ schedule.end_time }}</td></tr>
+</table>
+
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="id" value="{{ schedule.id }}" />
+<p><input class="delete" type="submit" value="Delete" /><span style="padding-left:15px;"><a href="{% url 'macs.views.schedule_show' %}">Cancel</a></span></p>
+</form>
+
+{% endblock content %}

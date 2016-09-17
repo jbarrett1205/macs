@@ -1,0 +1,43 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Makerspace Access Schedule</h1>
+
+<h2>Daily Schedule</h2>
+
+<p>The daily schedule is the default schedule for allowing access to the Makerspace. The time
+windows below are the default daily times when the Makerspace is open.</p>
+
+<table class="padded">
+<tr><th>Day</th><th>Opens At</th><th>Closes At</th><th>&nbsp;</th><th>&nbsp;</th></tr>
+{% for d in daily_schedule %}
+	<tr class="{% cycle 'odd' 'even' %}"><td>{{ d.get_day_display }}</td><td>{{ d.start_time }}</td><td>{{ d.end_time }}</td>
+	   <td><a href="{% url 'macs.views.schedule_edit_daily' d.id %}">edit</a></td>
+	   <td><a href="{% url 'macs.views.schedule_remove_daily' d.id %}">delete</a></td>
+	   </tr>
+{% endfor %} 
+</table>
+<p><a href="{% url 'macs.views.schedule_add_daily' %}">Add a new daily schedule window</a></p>
+
+
+<h2>Schedule Exeptions</h2>
+
+<p>Exceptions override the default schedule for the Makerspace.  Exceptions can either open or close the
+space for a specific date and time window.</p>
+
+<table class="padded">
+<tr><th>Day</th><th>Start Time</th><th>End Time</th><th>Status</th><th>Comment</th><th>&nbsp;</th><th>&nbsp;</th></tr>
+{% for d in upcoming_exceptions %}
+	<tr class="{% cycle 'odd' 'even' %}"><td>{{ d.date }}</td><td>{{ d.start_time }}</td><td>{{ d.end_time }}</td>
+	   <td>{% if d.open %}<span style="color:green;">Open</span>{% else %}<span style="color:red;">Closed</span>{% endif %}</td>
+	   <td>{{ d.comment|default:"&nbsp;" }}</td>
+	   <td><a href="{% url 'macs.views.schedule_edit_exception' d.id %}">edit</a></td>
+	   <td><a href="{% url 'macs.views.schedule_remove_exception' d.id %}">delete</a></td>
+	   </tr>
+{% endfor %} 
+</table>
+<p><a href="{% url 'macs.views.schedule_add_exception' %}">Add a new exception</a></p>
+
+
+{% endblock content %}

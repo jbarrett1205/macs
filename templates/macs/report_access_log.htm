@@ -1,0 +1,30 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+<h1>Resource Access Log</h1>
+
+<p>All resource access requests that are received by the server are logged. The last 90 days worth are
+available here.</p>
+
+<p><a href="{{ request.path }}?csv=t">Download</a> (CSV format)</p>
+
+{% with page.paginator.count as n %}
+    {% if n %}
+        <table class="fullwidth padded">
+          <tr><th>Timestamp</th><th>Resource ID</th><th>Keycard</th><th>Member</th><th>Allowed?</th><th>Reason</th></tr>
+        {% for x in page.object_list %}
+          <tr class="{% cycle 'odd' 'even' %}"><td>{{ x.timestamp }}</td><td>{{ x.resource.id }}</td><td>{{ x.keycard }}</td>
+		     <td>{{ x.member.get_full_name }}</td><td>{% if x.allowed %}Yes{% else %}<span style="color:#ff0000;font-weight:bold;">No</span>{% endif %}</td>
+			 <td>{% if x.allowed %}&nbsp;{% else %}{{ x.reason_code }}{% endif %}</td></tr>
+        {% endfor %}
+        </table>
+        
+      {% include "macs/snippet_pagination.htm" %}
+      
+    {% else %}
+       <p class="note">Nothing logged.</p>
+    {% endif %}
+{% endwith %}
+
+
+{% endblock content %}

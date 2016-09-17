@@ -1,0 +1,33 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Edit schedule exception</h1>
+
+<p>Exceptions override the daily schedule by either allowing the Makerspace to be open when it might normally be closed
+(such as on a school hoilday or during a vacation week), or can be used to close the Makerspace when it would normally
+be open to accomodate a special event.</p>
+
+<p>The &quot;Start time&quot; and &quotEnd time&quot; must be entered in 24-hour format (e.g. 7:00, 16:30, 18:00, etc).</p>
+
+<form method="post">
+{% csrf_token %}
+
+<p class="errors">{{ form.non_field_errors }}</p>
+
+<table class="padded">
+<tr><th>{{ form.date.label }}</th><td>{{ form.date }}</td><td>{{ form.date.errors }}</td></tr>
+<tr><th>{{ form.start_time.label }}</th><td>{{ form.start_time }}</td><td>{{ form.start_time.errors }} <span style="font-style:italic;">e.g. 8:00</span></td></tr>
+<tr><th>{{ form.end_time.label }}</th><td>{{ form.end_time }}</td><td>{{ form.end_time.errors }} <span style="font-style:italic;">e.g. 23:00</span></td></tr>
+<tr><th>{{ form.open.label }}</th><td>{{ form.open }}</td><td>{{ form.open.errors }}</td></tr>
+<tr><th>{{ form.comment.label }}</th><td>{{ form.comment }}</td><td>{{ form.comment.errors }}</td></tr>
+</table>
+
+<p><input type="submit" value="Save" /></p>
+</form>
+
+<script type="text/javascript">
+$('#id_date').datepicker({dateFormat:'yy-mm-dd'})
+</script>
+
+{% endblock content %}
