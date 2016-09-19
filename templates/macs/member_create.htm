@@ -7,7 +7,7 @@
 <form method="post">
 {% csrf_token %}
 
-<p class="form_errors">{{ form.non_field_errors }}<p>
+<p class="form_errors">{{ form.non_field_errors }}</p>
 
 <table class="padded">
 <tr><th>{{ form.first_name.label }}</th><td>{{ form.first_name }}</td><td>{{ form.first_name.errors }}</td></tr>
@@ -15,18 +15,46 @@
 <tr><th>{{ form.email.label }}</th><td>{{ form.email }}</td><td>{{ form.email.errors }}</td></tr>
 <tr><th>{{ form.username.label }}</th><td>{{ form.username }}</td><td>{{ form.username.errors }}</td></tr>
 <tr><th>{{ form.membership_type.label }}</th><td>{{ form.membership_type }}</td><td>{{ form.membership_type.errors }}</td></tr>
-<tr><th>{{ form.keycard.label }}</th><td>{{ form.keycard }}</td><td>{{ form.keycard.errors }}</td></tr>
 <tr><th>{{ form.expires.label }}</th><td>{{ form.expires }}</td><td>{{ form.expires.errors }}</td></tr>
 <tr><th>{{ form.billing_id.label }}</th><td>{{ form.billing_id }} (leave blank for now)</td><td>{{ form.billing_id.errors }}</td></tr>
 <tr><th style="vertical-align:top;">{{ form.comments.label }}</th><td>{{ form.comments }}</td><td>{{ form.comments.errors }}</td></tr>
 </table>
+
+<fieldset>
+<legend>Keycard Assignment</legend>
+   <p class="form_errors">{{ keycard_form.non_field_errors }}<p>
+   <table class="padded">
+     <tr><th>Action</th><td>{{ keycard_form.action }}</td><td>{{ keycard_form.action.errors }}</td></tr>
+     <tr id="new_keycard_row"><th>New Keycard Number</th><td>{{ keycard_form.number }}</td><td>{{ keycard_form.number.errors }}</td></tr>
+     <tr id="select_keycard_row"><th>Select Keycard</th><td>{{ keycard_form.select_keycard }}</td><td>{{ keycard_form.select_keycard.errors }}</td></tr>
+   </table>
+</fieldset>
+
 
 <p><input type="submit" value="Create Account" /></p>
 
 </form>
 
 <script type="text/javascript">
-$('#id_expires').datepicker({dateFormat:'yy-mm-dd'})
+$('#id_expires').datepicker({dateFormat:'yy-mm-dd'});
+$('#new_keycard_row').hide();
+$('#select_keycard_row').hide();
+
+$('#id_action').on('change', function() {
+   var val = parseInt($('#id_action').val());
+   if( val == 1 ) {
+      $('#new_keycard_row').show()
+      $('#select_keycard_row').hide()
+   }
+   else if( val == 2 ) {
+      $('#new_keycard_row').hide()
+      $('#select_keycard_row').show()
+   }
+   else {
+      $('#new_keycard_row').hide()
+      $('#select_keycard_row').hide()
+   }
+});
 </script>
 
 {% endblock content %}

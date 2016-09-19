@@ -17,6 +17,8 @@ can solicit payments/donations. This field is in dollars.</p>
 <form method="post">
 {% csrf_token %}
 
+<p class="form_errors">{{ form.non_field_errors }}</p>
+
 <table class="padded">
 <tr><th>{{ form.name.label }}</th><td>{{ form.name }}</td><td>{{ form.name.errors }}</td></tr>
 <tr><th>{{ form.description.label }}</th><td>{{ form.description }}</td><td>{{ form.description.errors }}</td></tr>
@@ -24,7 +26,9 @@ can solicit payments/donations. This field is in dollars.</p>
 <tr><th>{{ form.cost_per_hour.label }}</th><td>{{ form.cost_per_hour }}</td><td>{{ form.cost_per_hour.errors }}</td></tr>
 </table>
 
-<p><input type="submit" value="Save Changes" /></p>
+<p><input type="submit" value="Save Changes" />
+   <span style="padding-left:15px;"><a href="{% url 'macs.views.resource_view' resource.id %}">Cancel</a></span></p>
+
 </form>
 
 {% endblock content %}

@@ -2,6 +2,9 @@
 
 {% block content %}
 
+<ul>
+</ul>
+
 <h2>Member Info</h2>
 
 <table class="padded">
@@ -17,6 +20,21 @@
 <textarea rows="8" cols="70" readonly="readonly" disabled="disabled">{{ member.comments }}</textarea>
 </p>
 
+<p><a href="{% url 'macs.views.member_edit' member.id %}">Edit member info</a></p>
+
+<h2>Keycards</h2>
+<table class="padded">
+   <tr><th>ID</th><th>Status</th><th>&nbsp;</th></tr>
+{% for card in member.keycard_set.all %}
+   <tr class="{% cycle 'odd' 'even' %}"><td>{{ card.number }}</td>
+      <td>{% if card.active %}<span style="color:#00ff00;">active</span>{% else %}<span style="color:#ff0000;font-style:italic;">inactive</span>{% endif %}</td>
+      <td><a href="{% url 'macs.views.keycard_manage' card.id %}">manage</a></td>
+   </tr>
+{% endfor %}
+</table>
+
+<p><a href="{% url 'macs.views.member_manage_keycards' member.id %}">Assign a Keycard</a></p>
+  
 <h2>Resources</h2>
 
 <table class="padded">
@@ -26,11 +44,6 @@
 {% endfor %}
 </table>
 
-<h2>Actions</h2>
-
-<ul>
-  <li><a href="{% url 'macs.views.member_edit' member.id %}">Edit member information</a></li>
-  <li><a href="{% url 'macs.views.add_resource_access' member.id %}">Add new resources</a></li>  
-</ul>
+<p><a href="{% url 'macs.views.add_resource_access' member.id %}">Add resources</a></p>  
 
 {% endblock content %}

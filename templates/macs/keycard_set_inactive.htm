@@ -1,0 +1,21 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Set Keycard Inactive</h1>
+
+<p class="warning">Are you sure you set this keycard to be inactive?</p>
+
+<table class="padded">
+<tr><th>Keycard ID</th><td>{{ keycard.number }}</td></tr>
+<tr><th>Comment</th><td>{{ keycard.comment|default:"&nbsp;" }}</td></tr>
+</table>
+
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="id" value="{{ keycard.id }}" />
+<p><input type="submit" value="Set Inactive" />
+   <span style="padding-left:15px;"><a href="{% url 'macs.views.keycard_manage' keycard.id %}">Cancel</a></span></p>
+</form>
+
+{% endblock content %}

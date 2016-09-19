@@ -10,8 +10,9 @@
 <tr class="odd"><th>Description</th><td>{{ resource.description }}</td></tr>
 <tr class="even"><th>Secret Key</th><td>{{ resource.secret }}</td></tr>
 <tr class="odd"><th>Cost Per Hour</th><td>{{ resource.cost_per_hour }}</td></tr>
-
 </table>
+
+<p><a href="{% url 'macs.views.resource_edit' resource.id %}">Edit resource info</a></p>
 
 <h2>Members with Access</h2>
 

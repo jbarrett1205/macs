@@ -1,0 +1,56 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h2>Member: {{ member.get_full_name }}</h2>
+
+<fieldset>
+<legend>Keycard Assignment</legend>
+   <form method="post">
+   {% csrf_token %}
+   <p class="form_errors">{{ form.non_field_errors }}</p>
+   
+   <table class="padded">
+     <tr><th>Action</th><td>{{ form.action }}</td><td>{{ form.action.errors }}</td></tr>
+     <tr id="new_keycard_row"><th>New Keycard Number</th><td>{{ form.number }}</td><td>{{ form.number.errors }}</td></tr>
+     <tr id="select_keycard_row"><th>Select Keycard</th><td>{{ form.select_keycard }}</td><td>{{ form.select_keycard.errors }}</td></tr>
+   </table>
+   
+   <p><input type="submit" value="Assign" />
+      <span style="padding-left:15px;"><a href="{% url 'macs.views.member_view' member.id %}">Cancel</a></span></p>
+   </form>
+</fieldset>
+
+<h3>Existing Keycards</h3>
+<table class="padded">
+   <tr><th>ID</th><th>Status</th><th>&nbsp;</th></tr>
+{% for keycard in member.keycard_set.all %}
+   <tr class="{% cycle 'odd' 'even' %}"><td>{{ keycard.number }}</td>
+      <td>{% if keycard.active %}<span style="color:#00ff00;">active</span>{% else %}<span style="color:#ff0000;font-style:italic;">inactive</span>{% endif %}</td>
+      <td><a href="{% url 'macs.views.keycard_manage' keycard.id %}">manage</a></td>
+   </tr>
+{% endfor %}
+</table>
+
+<script type="text/javascript">
+$('#new_keycard_row').show();
+$('#select_keycard_row').hide();
+
+$('#id_action').on('change', function() {
+   var val = parseInt($('#id_action').val());
+   if( val == 1 ) {
+      $('#new_keycard_row').show()
+      $('#select_keycard_row').hide()
+   }
+   else if( val == 2 ) {
+      $('#new_keycard_row').hide()
+      $('#select_keycard_row').show()
+   }
+   else {
+      $('#new_keycard_row').hide()
+      $('#select_keycard_row').hide()
+   }
+});
+</script>
+
+{% endblock content %}

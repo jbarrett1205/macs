@@ -18,14 +18,11 @@ import random
 import json
 import datetime
 import csv as csv_module
+import re
+from StringIO import StringIO
 
-from .models import Member, Resource, ResourceAllowed, ResourceAccessLog, DailySchedule, ScheduleException
-
-GRACE_PERIOD_DAYS = settings.MACS_GRACE_PERIOD_DAYS if hasattr(settings,'MACS_GRACE_PERIOD_DAYS') else 5
-DOOR_RESOURCE_NAME = settings.MACS_DOOR_RESOURCE_NAME if hasattr(settings,'MACS_DOOR_RESOURCE_NAME') else 'main_door'
-
-# members that can be granted door access
-MEMBER_TYPES_EXEMPT_FROM_SCHEDULE = ('teacher','administrative')
+from .models import Member, Keycard, Resource, ResourceAllowed, ResourceAccessLog, DailySchedule, ScheduleException
+from .local_settings import *
 
 # denied access reason codes
 ACCESS_DENIED_EXPIRED = 1
@@ -42,7 +39,6 @@ denied_reason = [
     'invalid keycard',
     'makerspace closed',
 ]
-
 
 class MyJSONResponse(HttpResponse):
     "JSON response object"
@@ -76,7 +72,7 @@ def _validate_resource(request, resource_id):
     return resource
     
     
-def _polulate_validation_dict(resource_id, member, ok=False):
+def _polulate_validation_dict(resource_id, keycard_id, member, ok=False):
     "populate the dictionary that is returned as a JSON Object"
     
     r = {
@@ -85,7 +81,7 @@ def _polulate_validation_dict(resource_id, member, ok=False):
         'last_name':'',
         'user_id':'',
         'resource_id':int(resource_id),
-        'access_card_id':'',
+        'access_card_id':keycard_id,
         'expires':'1999/01/01',
         'notok_reason':'',
         'type':'',
@@ -95,7 +91,6 @@ def _polulate_validation_dict(resource_id, member, ok=False):
         r['first_name'] = member.first_name
         r['last_name'] = member.last_name
         r['user_id'] = member.username
-        r['access_card_id'] = member.keycard
         r['expires'] = member.expires.strftime('%Y/%m/%d')
         r['type'] = member.membership_type
     
@@ -118,7 +113,7 @@ def macs_default_context( c=None ):
 def _schedule_allowed(member):
     "check the access schedule to determine if the access should be allowed"
     # always return true for member types that are exempt from the schedule
-    if member.membership_type in MEMBER_TYPES_EXEMPT_FROM_SCHEDULE:
+    if member.membership_type in MACS_MEMBER_TYPES_EXEMPT_FROM_SCHEDULE:
         return True
     
     now = datetime.datetime.now()
@@ -180,12 +175,14 @@ def json_download_members(request, resource_id):
         if not member.is_active:
             # account inactive
             pass
-        elif (member.expires - datetime.date.today()).days < -GRACE_PERIOD_DAYS:
+        elif (member.expires - datetime.date.today()).days < -MACS_GRACE_PERIOD_DAYS:
             # account expired
             pass
         else:
             # member account is valid, add it to the list
-            r.append(_polulate_validation_dict(resource_id,member,True))
+            # add an entry for each each keycard that is tied to the member
+            for keycard in member.keycard_set.all():
+                r.append(_polulate_validation_dict(resource_id,keycard.number,member,True))
 
     # convert to JSON and return
     return MyJSONResponse(r)
@@ -201,19 +198,23 @@ def json_validate_member(request, resource_id, keycard_id):
     
     # locate the member by the keycard ID
     try:
-        member = Member.objects.get(keycard__iexact=keycard_id)
-    except Member.DoesNotExist:
+        keycard = Keycard.objects.get(number__iexact=keycard_id)
+        member = keycard.member
+    except Keycard.DoesNotExist:
         member = None
         
-    # populate the initial return structure
-    r = _polulate_validation_dict(resource_id,member)
+    # populate the initial return structure, at this point the sturcture is
+    # as full as it can be and the only things left to determine are the
+    # state of the 'ok' flag and the 'notok_reason' which we will
+    # figure out in the next block of code
+    r = _polulate_validation_dict(resource_id,keycard_id,member)
         
     why_denied = 0    
     if member is not None:
         # check that the member account is valid
         if not member.is_active:
             why_denied = ACCESS_DENIED_INACTIVE
-        elif (member.expires - datetime.date.today()).days < -GRACE_PERIOD_DAYS:
+        elif (member.expires - datetime.date.today()).days < -MACS_GRACE_PERIOD_DAYS:
             why_denied = ACCESS_DENIED_EXPIRED
         else:
             # first check the access schedule to see that the member
@@ -230,7 +231,6 @@ def json_validate_member(request, resource_id, keycard_id):
     else:
         # no member matched the keycard, fill in the passed keycard ID
         # and set the notok_reason field
-        r['access_card_id'] = keycard_id
         why_denied = ACCESS_DENIED_BAD_KEYCARD
     
     r['notok_reason'] = denied_reason[why_denied]
@@ -256,34 +256,57 @@ class CreateEditMemberForm(djforms.ModelForm):
     
     class Meta:
         model = Member
-        fields = ['first_name','last_name','email','username','membership_type','keycard','expires','billing_id','comments']
+        fields = ['first_name','last_name','email','username','membership_type','expires','billing_id','comments']
+
+class CreateAssignKeycardForm(djforms.Form):
+    "create a new keycard or assign an existing one"
+    KEYCARD_CHOICES = [
+        ('0','No Keycard'),
+        ('1','Create New Keycard'),
+        ('2','Select From Existing Keycards'),
+    ]
+    KEYCARD_CHOICES2 = [
+        ('1','Create New Keycard'),
+        ('2','Select From Existing Keycards'),
+    ]
+    _check_card_number = re.compile(r'^[0123456789abcdef]{8,}$',re.I)
+    number = djforms.CharField(max_length=64,required=False)
+    select_keycard = djforms.ModelChoiceField(queryset=Keycard.objects.filter(member__isnull=True,active=True),required=False)
     
-    def clean_keycard(self):
-        "ensure that non-blank keycard fields are unique in the database"
-        keycard = self.cleaned_data['keycard'].strip()
-        if not len(keycard):
-            # blank keycard entries are fine, they won't match any queries
-            # this exists so that member accounts can be created before a keycard
-            # is assigned
-            return u''
-            
+    def __init__(self, include_no_keycard, *args, **kwargs):
+        "allow changing of which action fields are allowed"
+        super(CreateAssignKeycardForm,self).__init__(*args,**kwargs)
+        if include_no_keycard:
+            c = self.KEYCARD_CHOICES
+        else:
+            c = self.KEYCARD_CHOICES2
+        self.fields['action'] = djforms.ChoiceField(choices=c)
+        
+    def clean_action(self):
+        "turn the action into an integer"
         try:
-            m = Member.objects.get(keycard__iexact=keycard)
-            if self.instance.id != m.id:
-                # uh oh, another member has this keycard assigned
-                name = m.first_name+' '+m.last_name
-                raise djforms.ValidationError("This keycard is already assigned to '%s'. Remove it from that account first."%name)
-        except Member.DoesNotExist:
-            # good, no other member has this keycard assigned to them
-            pass
-        except Member.MultipleObjectsReturned:
-            # this is really bad, there are already more than one member assigned
-            # to this keycard, this should not be possible unless the database
-            # is manually edited
-            raise djforms.ValidationError("DANGER WILL ROBINSON! This keycard is assigned to multiple members already!")
-            
-        return keycard
+            action = int(self.cleaned_data['action'])
+        except Exception:
+            raise djforms.ValidationError("Invalid action.")
+        return action
     
+    def clean(self):
+        "check that necessary fields are filled out"
+        action = self.cleaned_data['action']
+        if action == 0:
+            pass        
+        elif action == 1:
+            # check that the number field is valid
+            if not self._check_card_number.match(self.cleaned_data['number']):
+                self.add_error('number',djforms.ValidationError('Keycard ID must be hexadecimal with at least 8 characters.'))
+        elif action == 2:
+            # check that the select_keycard field is valid
+            if not isinstance(self.cleaned_data['select_keycard'],Keycard):
+                self.add_error('select_keycard',djforms.ValidationError('Invalid keycard selected.'))
+        
+        return self.cleaned_data
+
+        
 @permission_required('macs.change_member')
 def member_create(request):
     "create a new makerspace member account"
@@ -291,14 +314,15 @@ def member_create(request):
     context = macs_default_context()
     
     if request.method == 'POST':
-        form = CreateEditMemberForm(request.POST,request.FILES)    
-        if form.is_valid():
+        form = CreateEditMemberForm(request.POST,request.FILES)
+        keycard_form = CreateAssignKeycardForm(True,request.POST,request.FILES)
+        if form.is_valid() and keycard_form.is_valid():
             door = None
             try:
                 # make sure that the "door" resource exists
-                door = Resource.objects.get(name__exact=DOOR_RESOURCE_NAME)
+                door = Resource.objects.get(pk=MACS_DOOR_RESOURCE_ID)
             except Resource.DoesNotExist:
-                messages.add_message(request,messages.ERROR,'The main door resource must exist and must be named `%s`.'%DOOR_RESOURCE_NAME)
+                messages.add_message(request,messages.ERROR,'The main door resource must exist with resource id `%d`.'%MACS_DOOR_RESOURCE_ID)
             
             if door:
                 # create the member account
@@ -315,16 +339,27 @@ def member_create(request):
                 ra = ResourceAllowed(member=member,resource=door,trainer='n/a')
                 ra.save()
                 
-                ##### TODO: set up e-mails to initialize the login password
+                # create or assign keycards
+                keycard_data = keycard_form.cleaned_data
+                action = keycard_data['action']
+                if action == 1:
+                    # create a new keycard and attach the member to it
+                    keycard = Keycard(number=keycard_data['number'],member=member,active=True)
+                    keycard.save()                                    
+                elif action == 2:
+                    # keycard selected, attach the member to it
+                    keycard = keycard_data['select_keycard']
+                    keycard.member = member
+                    keycard.save()
                 
-                
-                
-                return redirect(member)    
+                return redirect(member)
     else:
-        # create an un-bound form when the request is not a POST
+        # create an un-bound forms when the request is not a POST
         form = CreateEditMemberForm()
+        keycard_form = CreateAssignKeycardForm(True)
         
     context['form'] = form
+    context['keycard_form'] = keycard_form
     return render(request,'macs/member_create.htm',context)
     
 @permission_required('macs.change_member')
@@ -362,6 +397,183 @@ def member_edit(request, member_id):
     
     return render(request,'macs/member_edit.htm',context)
 
+@permission_required('macs.change_member')
+def add_resource_access(request, member_id):
+    "assign a mmeber access to a new resource"
+    member = get_object_or_404(Member,pk=member_id)    
+    context = macs_default_context({'member':member})
+    
+    already_have_resource_ids = list(x.resource.id for x in ResourceAllowed.objects.filter(member__id=member.id))
+    qs = Resource.objects.all().exclude(id__in=already_have_resource_ids)
+    
+    class AddResourceAccessForm(djforms.Form):
+        "form to add a resource to a member"
+        
+        resource = djforms.ModelChoiceField(queryset=qs)
+        trainer = djforms.CharField(max_length=64)
+        comment = djforms.CharField(max_length=255,required=False)
+        
+    if request.method == 'POST':
+        form = AddResourceAccessForm(request.POST,request.FILES)
+        if form.is_valid():
+            d = form.cleaned_data
+            ra = ResourceAllowed(member=member,resource=d['resource'],trainer=d['trainer'],comment=d['comment'])
+            ra.save()
+            
+            return redirect(member)
+    else:
+        form = AddResourceAccessForm()
+        
+    context['form'] = form
+    
+    return render(request,'macs/member_add_resource.htm',context)
+    
+@permission_required('macs.change_member')
+def member_manage_keycards(request, member_id):
+    "edit a member account"
+    member = get_object_or_404(Member,pk=member_id)    
+    context = macs_default_context({'member':member})
+    
+    if request.method == 'POST':
+        form = CreateAssignKeycardForm(False,request.POST,request.FILES)
+        if form.is_valid():
+            keycard_data = form.cleaned_data
+            action = keycard_data['action']
+            if action == 1:
+                # create a new keycard and attach the member to it
+                keycard = Keycard(number=keycard_data['number'],member=member,active=True)
+                keycard.save()                                    
+            elif action == 2:
+                # keycard selected, attach the member to it
+                keycard = keycard_data['select_keycard']
+                keycard.member = member
+                keycard.save()
+            
+            return redirect(request.get_full_path())
+    else:
+        form = CreateAssignKeycardForm(False)
+    
+    context['form'] = form
+    
+    return render(request,'macs/member_manage_keycards.htm',context)    
+
+###########################################################################################################
+###########################################################################################################
+#######                           keycard management view                                           ####### 
+###########################################################################################################
+###########################################################################################################
+
+def keycard_manage_all(request):
+    "manage all keycards in the system"
+    context = macs_default_context({
+        'unassigned':Keycard.objects.filter(member__isnull=True),
+        'assigned':Keycard.objects.filter(member__isnull=False).order_by('member__last_name','member__first_name'),
+    })
+
+    return render(request,'macs/keycard_manage_all.htm',context)
+
+def keycard_manage(request, key_id):
+    "manage an individual keycard"
+    keycard = get_object_or_404(Keycard,pk=key_id)
+    return render(request,'macs/keycard_manage.htm',macs_default_context({'keycard':keycard}))
+    
+def keycard_set_inactive(request, key_id):
+    "set a keycard to be inactive"
+    keycard = get_object_or_404(Keycard,pk=key_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(key_id):
+                keycard.active = False
+                keycard.save()
+                return redirect(keycard)
+            else:
+                raise ValueError('Validation error.')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to inactivate keycard -> "+str(e))
+        
+    return render(request,'macs/keycard_set_inactive.htm',macs_default_context({'keycard':keycard}))
+
+def keycard_set_active(request, key_id):
+    "set a keycard to be active"
+    keycard = get_object_or_404(Keycard,pk=key_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(key_id):
+                keycard.active = True
+                keycard.save()
+                return redirect(keycard)
+            else:
+                raise ValueError('Validation error.')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to activate keycard -> "+str(e))
+        
+    return render(request,'macs/keycard_set_active.htm',macs_default_context({'keycard':keycard}))
+
+def keycard_unassign(request, key_id):
+    "unassign a keycard from a member"
+    keycard = get_object_or_404(Keycard,pk=key_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(key_id):
+                keycard.member = None
+                keycard.save()
+                return redirect(keycard)
+            else:
+                raise ValueError('Validation error.')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to unassign keycard -> "+str(e))
+        
+    return render(request,'macs/keycard_unassign.htm',macs_default_context({'keycard':keycard}))
+    
+    
+class KeycardCsvUploadForm(djforms.Form):
+    "form for uploading keycards from CSV"
+    csv_file = djforms.FileField()
+    
+def keycard_csv_upload(request):
+    "upload a batch of keycards in a CSV file"
+    
+    if request.method == 'POST':
+        form = KeycardCsvUploadForm(request.POST,request.FILES)
+        if form.is_valid():
+            try:
+                # read the CSV file, use a StringIO object to buffer the
+                # data since the django UploadedFile object does not have
+                # a readline() method which is needed by the csv module
+                fp = StringIO(request.FILES['csv_file'].read())
+                warnings = []
+                new_card_count = 0
+                reader = csv_module.reader(fp)
+                for i,row in enumerate(reader):
+                    if i == 0:
+                        continue
+                    
+                    if len(row) < 2:
+                        warnings.append('Row %d: not enough data')
+                        continue
+                    
+                    try:
+                        keycard = Keycard(number=row[0],comment=row[1],active=True)
+                        keycard.save()           
+                        new_card_count += 1
+                    except Exception as e:
+                        warnings.append('Row %d: could not create keycard -> '+str(e))
+                
+                if len(warnings):
+                    messages.add_message(request,messages.WARNING,'<br />'.join(warnings))
+                messages.add_message(request,messages.SUCCESS,'Added %d new keycards'%new_card_count)
+                
+                return redirect('macs.views.keycard_manage_all')
+                
+            except Exception as e:
+                messages.add_message(request,messages.ERROR,'Unable to parse CSV file -> '+str(e))
+    else:
+        form = KeycardCsvUploadForm()
+
+    return render(request,'macs/keycard_csv_upload.htm',macs_default_context({'form':form}))
 
 ###########################################################################################################
 ###########################################################################################################
@@ -435,43 +647,6 @@ def resource_edit(request, resource_id):
     context['form'] = form
     return render(request,'macs/resource_edit.htm',context)
 
-###########################################################################################################
-###########################################################################################################
-#######                     views for allowing users to access resources                            ####### 
-###########################################################################################################
-###########################################################################################################
-
-@permission_required('macs.change_member')
-def add_resource_access(request, member_id):
-    "assign a mmeber access to a new resource"
-    member = get_object_or_404(Member,pk=member_id)    
-    context = macs_default_context({'member':member})
-    
-    already_have_resource_ids = list(x.resource.id for x in ResourceAllowed.objects.filter(member__id=member.id))
-    qs = Resource.objects.all().exclude(id__in=already_have_resource_ids)
-    
-    class AddResourceAccessForm(djforms.Form):
-        "form to add a resource to a member"
-        
-        resource = djforms.ModelChoiceField(queryset=qs)
-        trainer = djforms.CharField(max_length=64)
-        comment = djforms.CharField(max_length=255,required=False)
-        
-    if request.method == 'POST':
-        form = AddResourceAccessForm(request.POST,request.FILES)
-        if form.is_valid():
-            d = form.cleaned_data
-            ra = ResourceAllowed(member=member,resource=d['resource'],trainer=d['trainer'],comment=d['comment'])
-            ra.save()
-            
-            return redirect(member)
-    else:
-        form = AddResourceAccessForm()
-        
-    context['form'] = form
-    
-    return render(request,'macs/member_add_resource.htm',context)
-    
 ###########################################################################################################
 ###########################################################################################################
 #######                     views for allowing users to view reports                                ####### 

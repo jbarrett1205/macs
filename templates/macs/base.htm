@@ -54,22 +54,22 @@ jQuery(document).ready( function($) {
 
   <ul class="navbar">
       <li>
-	    <a href="#">Members</a>
+	    <a href="#">Accounts</a>
         <ul>
-          <li><a href="{% url 'macs.views.member_create' %}">Create</a></li>
-          <li><a href="{% url 'macs.views.member_list' %}">List</a></li>
-          <!-- <li><a href="">Search ...</a></li> -->
+          <li><a href="{% url 'macs.views.member_create' %}">New Member</a></li>
+          <li><a href="{% url 'macs.views.member_list' %}">List Members</a></li>
+          <li><a href="{% url 'macs.views.keycard_manage_all' %}">Manage Keycards</a></li>
         </ul>
 	  </li><li>
         <a href="#">Resources</a>
         <ul>
-          <li><a href="{% url 'macs.views.resource_create' %}">Create</a></li>
-          <li><a href="{% url 'macs.views.resource_list' %}">List</a></li>
+          <li><a href="{% url 'macs.views.resource_create' %}">Create Resource</a></li>
+          <li><a href="{% url 'macs.views.resource_list' %}">List Resources</a></li>
         </ul>
       </li><li>
         <a href="#">Reports</a>
         <ul>
-          <li><a href="{% url 'macs.views.report_access_log' %}">Access Log</a></li>
+          <li><a href="{% url 'macs.views.report_access_log' %}">Resource Access Log</a></li>
         </ul>
 	  </li><li>
 	    <a href="{% url 'macs.views.schedule_show' %}">Schedule</a>

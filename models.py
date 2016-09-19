@@ -1,10 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.core.exceptions import ValidationError
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
+import re
 
 MEMBERSHIP_TYPES = [
     ('individual','Individual'),
@@ -13,23 +15,13 @@ MEMBERSHIP_TYPES = [
     ('teacher','Teacher'),
 ]
 
-    
 class Member(User):
     """Core membership info for a Makerspace user
     
     This model is derived from the Django built-in User model which handles
     the default authentication in the Django infrastructure.
-    
-    This model adds fields to keep track of 
-      - the member's assigned keycard for resource access
-      - the membership type (individual, family, other(?))
-      - the membership expiration date
-      - linked membership accounts
-      - resources that a member has access to
-    
     """
     
-    keycard = models.CharField(max_length=64,blank=True,help_text="Keycard ID String (hexadecimal)")
     membership_type = models.CharField(max_length=64,choices=MEMBERSHIP_TYPES,help_text="Type of membership")
     expires = models.DateField()
     resources = models.ManyToManyField('Resource',through='ResourceAllowed',through_fields=('member','resource'))
@@ -45,6 +37,29 @@ class Member(User):
 
     class Meta:
         ordering = ('last_name','first_name')
+        
+def keycard_number_ok( value ):
+    "keycard number validator"
+    if not re.match(r'^[0123456789abcdef]{8,}$',value, re.I):
+        raise ValidationError('keycard ID must be a hexadecimal string, 8 characters or more')
+    
+        
+class Keycard(models.Model):
+    "keycard assigned to a member and used for resource access"
+    number = models.CharField(max_length=64,unique=True,help_text="Keycard ID String (hexadecimal)",validators=[keycard_number_ok])
+    member = models.ForeignKey(Member,null=True,blank=True,on_delete=models.SET_NULL,help_text="Member assigned to this card")
+    active = models.BooleanField(default=True,blank=True,help_text="keycard is active")
+    comment = models.CharField(max_length=128,help_text="optional comment")
+    
+    def __unicode__(self):
+        return self.number + ' (' + self.comment.strip() + ')'
+    
+    def get_absolute_url(self):
+        return reverse('macs.views.keycard_manage',args=[str(self.id)])  
+        
+    class Meta:
+        ordering = ('active','number')
+        
         
 class Resource(models.Model):
     """Resources defined by the makerspace

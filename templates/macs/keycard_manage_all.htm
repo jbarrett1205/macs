@@ -1,0 +1,38 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Keycards</h1>
+
+<ul>
+  <li><a href="{% url 'macs.views.keycard_csv_upload' %}">Upload keycards from CSV</a></li>
+</ul>
+
+<h2>Unassigned Keycards</h2>
+
+<table class="padded">
+<tr><th>ID</th><th>Status</th><th>Comment</th><th>&nbsp;</th></tr>
+{% for keycard in unassigned %}
+	<tr class="{% cycle 'odd' 'even' %}">
+	   <td>{{ keycard.number }}</td><td>{% if keycard.active %}<span style="color:#00ff00;">active</span>{% else %}<span style="color:#ff0000;font-style:italic;">inactive</span>{% endif %}</td>
+	   <td>{{ keycard.comment|default:"&nbsp;" }}</td>
+	   <td><a href="{% url 'macs.views.keycard_manage' keycard.id %}">manage</a></td>
+	   </tr>
+{% endfor %} 
+</table>
+
+<h2>Assigned Keycards</h2>
+
+<table class="padded">
+<tr><th>ID</th><th>Last Name</th><th>First Name</th><th>Status</th><th>Comment</th><th>&nbsp;</th></tr>
+{% for keycard in assigned %}
+	<tr class="{% cycle 'odd' 'even' %}">
+	   <td>{{ keycard.number }}</td><td>{{ keycard.member.last_name }}</td><td>{{ keycard.member.first_name }}</td>
+	   <td>{% if keycard.active %}<span style="color:#00ff00;">active</span>{% else %}<span style="color:#ff0000;font-style:italic;">inactive</span>{% endif %}</td>
+	   <td>{{ keycard.comment|default:"&nbsp;" }}</td>
+	   <td><a href="{% url 'macs.views.keycard_manage' keycard.id %}">manage</a></td>
+	   </tr>
+{% endfor %} 
+</table>
+
+{% endblock content %}

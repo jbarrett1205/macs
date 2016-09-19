@@ -12,11 +12,12 @@
 
 {% if members %}
 	<table class="fullwidth padded">
-	<tr><th>ID</th><th>Last Name</th><th>First Name</th><th>Type</th><th>Keycard</th><th>Expires</th><th>&nbsp;</th></tr>
+	<tr><th>Last Name</th><th>First Name</th><th>Type</th><th>Keycard(s)</th><th>Expires</th><th>&nbsp;</th></tr>
 	{% for m in members %}
-		<tr class="{% cycle 'odd' 'even' %}"><td><a href="{% url 'macs.views.member_view' m.id %}">{{ m.id }}</a></td>
-		   <td>{{ m.last_name }}</td><td>{{ m.first_name }}</td><td>{{ m.get_membership_type_display }}</td><td>{{ m.keycard }}</td><td>{{ m.expires }}</td>
-		   <td><a href="{% url 'macs.views.member_edit' m.id %}">edit</a></td>
+		<tr class="{% cycle 'odd' 'even' %}">
+		   <td>{{ m.last_name }}</td><td>{{ m.first_name }}</td><td>{{ m.get_membership_type_display }}</td>
+		   <td>{{ m.keycard_set.all|join:", "|default:"&nbsp;" }}</td><td>{{ m.expires }}</td>
+		   <td><a href="{% url 'macs.views.member_view' m.id %}">details</a></td>
 		   </tr>
 	{% endfor %} 
 	</table>
