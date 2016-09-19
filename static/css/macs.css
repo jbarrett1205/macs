@@ -70,6 +70,34 @@ p.padded { padding-left:1em; padding-right:1em }
 .large, .larger { font-size:120% }
 .clearfix { clear:both; }
 
+p.blocknote {
+	border:1px solid #2f72ff;
+	background-color:#45d4ff;
+	color:#0040ff;
+	margin:1em 0;
+	padding:1em 0.7em;	
+}
+
+p.blockwarn {
+	border:1px solid #dad55e;
+	background-color:#fffa90;
+	color:#a17620;
+	margin:1em 0;
+	padding:1em 0.7em;	
+}
+
+p.blockalert {
+	border:1px solid #f1a899;
+	background-color:#fddfdf;
+	color:#c68058;
+	margin:1em 0;
+	padding:1em 0.7em;	
+}
+
+.rounded {
+	border-radius:3px;
+}
+
 .outlined { border:1px solid #404040; }
 .padded { padding:4px; }
 .separated { margin:3px 0; }

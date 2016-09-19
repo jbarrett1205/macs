@@ -23,7 +23,8 @@ be open to accomodate a special event.</p>
 <tr><th>{{ form.comment.label }}</th><td>{{ form.comment }}</td><td>{{ form.comment.errors }}</td></tr>
 </table>
 
-<p><input type="submit" value="Add" /></p>
+<p><input type="submit" value="Add" />
+   <span style="padding-left:15px;"><a href="{% url 'macs.views.schedule_show' %}">Cancel</a></span></p>
 </form>
 
 <script type="text/javascript">

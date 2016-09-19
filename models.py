@@ -33,7 +33,14 @@ class Member(User):
         return u'%s %s'%(self.first_name,self.last_name)
             
     def get_absolute_url(self):
-        return reverse('macs.views.member_view',args=[str(self.id)])  
+        return reverse('macs.views.member_view',args=[str(self.id)])
+        
+    def get_keycard_list(self):
+        "get a list of keycards by number"
+        r = []
+        for card in self.keycard_set.all():
+            r.append(card.number)
+        return r
 
     class Meta:
         ordering = ('last_name','first_name')

@@ -16,7 +16,7 @@
 	{% for m in members %}
 		<tr class="{% cycle 'odd' 'even' %}">
 		   <td>{{ m.last_name }}</td><td>{{ m.first_name }}</td><td>{{ m.get_membership_type_display }}</td>
-		   <td>{{ m.keycard_set.all|join:", "|default:"&nbsp;" }}</td><td>{{ m.expires }}</td>
+		   <td>{{ m.get_keycard_list|join:" / "|default:"&nbsp;" }}</td><td>{{ m.expires }}</td>
 		   <td><a href="{% url 'macs.views.member_view' m.id %}">details</a></td>
 		   </tr>
 	{% endfor %} 

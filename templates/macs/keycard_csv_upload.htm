@@ -4,9 +4,11 @@
 
 <h1>Upload Keycards</h1>
 
-<p>Keycards can be uploaded in CSV (comma-separated values) format. The format is &quot;keycard_id,comment&quot; - any CSV
-fields other than the first 2 are ignored. The &quot;keycard_id&quot; is a hexadecimal string and the comment can be blank. The
-parser skips the first line of the file as it is assumed to be headers.</p>
+<p class="blocknote rounded">Keycards can be uploaded in CSV (comma-separated values) format. The format is &quot;keycard_id,comment&quot; - any CSV
+fields other than the first 2 are ignored. The &quot;keycard_id&quot; is a hexadecimal string and the &quot;comment&quot; is
+optional and can be blank (but the column must exist in the file)</p>
+
+<p class="blocknote rounded">The parser skips the first line of the file as it is assumed to be headers.</p>
 
 <form method="post" enctype="multipart/form-data">
 {% csrf_token %}
