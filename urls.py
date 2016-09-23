@@ -5,6 +5,8 @@ urlpatterns = (
     url(r'^$',views.index,name="macs_home"),
     url(r'^q/(\d+)/$',views.json_download_members),
     url(r'^q/(\d+)/([a-fA-F0-9]{2,})/$',views.json_validate_member),
+    url(r'^q/schedule/$',views.json_get_schedule),
+    url(r'^q/schedule/(\d{2,4})/(\d{1,2})/(\d{1,2})/$',views.json_get_schedule),
     url(r'^members/create/$',views.member_create),
     url(r'^members/$',views.member_list),
     url(r'^members/(\d+)/$',views.member_view),

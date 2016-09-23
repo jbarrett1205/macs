@@ -30,14 +30,18 @@ ACCESS_DENIED_INACTIVE = 2
 ACCESS_DENIED_PERMISSION = 3
 ACCESS_DENIED_BAD_KEYCARD = 4
 ACCESS_DENIED_SCHEDULE = 5
+ACCESS_DENIED_KEYCARD_INACTIVE = 6
+ACCESS_DENIED_UNASSIGNED_KEYCARD = 7
 
-denied_reason = [
-    '',
+access_denied_reason = [
+    '',  # access allowed
     'account expired',
     'account inactive',
     'permission denied',
     'invalid keycard',
     'makerspace closed',
+    'keycard inactive',
+    'keycard unassigned',
 ]
 
 class MyJSONResponse(HttpResponse):
@@ -201,6 +205,7 @@ def json_validate_member(request, resource_id, keycard_id):
         keycard = Keycard.objects.get(number__iexact=keycard_id)
         member = keycard.member
     except Keycard.DoesNotExist:
+        keycard = None
         member = None
         
     # populate the initial return structure, at this point the sturcture is
@@ -209,31 +214,36 @@ def json_validate_member(request, resource_id, keycard_id):
     # figure out in the next block of code
     r = _polulate_validation_dict(resource_id,keycard_id,member)
         
-    why_denied = 0    
-    if member is not None:
-        # check that the member account is valid
-        if not member.is_active:
-            why_denied = ACCESS_DENIED_INACTIVE
-        elif (member.expires - datetime.date.today()).days < -MACS_GRACE_PERIOD_DAYS:
-            why_denied = ACCESS_DENIED_EXPIRED
-        else:
-            # first check the access schedule to see that the member
-            # is allowed to access at time time
-            if _schedule_allowed(member):
-                # next check for member access to the specified resource
-                result = member.resources.filter(id=resource_id)
-                if len(result):
-                    r['ok'] = 1
-                else:
-                    why_denied = ACCESS_DENIED_PERMISSION
+    why_denied = 0
+    if keycard is not None:
+        if member is not None:
+            # check that the member account is valid
+            if not member.is_active:
+                why_denied = ACCESS_DENIED_INACTIVE
+            elif (member.expires - datetime.date.today()).days < -MACS_GRACE_PERIOD_DAYS:
+                why_denied = ACCESS_DENIED_EXPIRED
+            elif not keycard.active:
+                why_denied = ACCESS_DENIED_KEYCARD_INACTIVE       
             else:
-                why_denied = ACCESS_DENIED_SCHEDULE
+                # first check the access schedule to see that the member
+                # is allowed to access at time time
+                if _schedule_allowed(member):
+                    # next check for member access to the specified resource
+                    result = member.resources.filter(id=resource_id)
+                    if len(result):
+                        r['ok'] = 1
+                    else:
+                        why_denied = ACCESS_DENIED_PERMISSION
+                else:
+                    why_denied = ACCESS_DENIED_SCHEDULE
+        else:
+            # keycard has no member assigned to it
+            why_denied = ACCESS_DENIED_UNASSIGNED_KEYCARD
     else:
-        # no member matched the keycard, fill in the passed keycard ID
-        # and set the notok_reason field
+        # keycard is not in the database
         why_denied = ACCESS_DENIED_BAD_KEYCARD
     
-    r['notok_reason'] = denied_reason[why_denied]
+    r['notok_reason'] = access_denied_reason[why_denied]
     
     # create a log entry
     try:
@@ -245,6 +255,45 @@ def json_validate_member(request, resource_id, keycard_id):
     # convert to JSON and return
     return MyJSONResponse(r)
         
+def json_get_schedule(request, year=None, month=None, day=None):
+    "get the makerspace schedule for a given day"
+    
+    if request.method != 'GET':
+        return HttpResponse(status=405)  # HTTP METHOD NOT ALLOWED
+    
+    if year is None:
+        # no date passed in, use today
+        query_date = datetime.date.today()
+    else:
+        # create a date from the passed in date parts
+        query_date = datetime.date(int(year),int(month),int(day))    
+
+    # schedule exceptions
+    exc = []
+    for v in ScheduleException.objects.filter(date__exact=query_date):
+        exc.append({
+            'start_time':v.start_time.strftime('%H:%M:%S'),
+            'end_time':v.end_time.strftime('%H:%M:%S'),
+            'open':v.open,
+            })
+    
+    # daily schedule
+    daily = []
+    for v in DailySchedule.objects.filter(day__exact=query_date.isoweekday()):
+        daily.append({
+            'start_time':v.start_time.strftime('%H:%M:%S'),
+            'end_time':v.end_time.strftime('%H:%M:%S'),
+            })
+    
+    r = {
+        'exceptions':exc,
+        'daily':daily,
+    }
+    
+    # convert to JSON and return
+    return MyJSONResponse(r)    
+    
+    
 ###########################################################################################################
 ###########################################################################################################
 #######                  member account creation and modification views                             ####### 
@@ -364,7 +413,7 @@ def member_create(request):
     
 @permission_required('macs.change_member')
 def member_list(request):
-    "view a member account"
+    "list all members"
     context = macs_default_context({'members':Member.objects.all()})
     return render(request,'macs/member_list.htm',context)
     
@@ -552,7 +601,7 @@ def keycard_csv_upload(request):
                         continue
                     
                     if len(row) < 2:
-                        warnings.append('Row %d: not enough data')
+                        warnings.append('Row %d: less than 2 columns'%(i+1))
                         continue
                     
                     try:
@@ -560,7 +609,7 @@ def keycard_csv_upload(request):
                         keycard.save()           
                         new_card_count += 1
                     except Exception as e:
-                        warnings.append('Row %d: could not create keycard -> '+str(e))
+                        warnings.append('Row %d: could not create keycard -> %s'%(i+1,e))
                 
                 if len(warnings):
                     messages.add_message(request,messages.WARNING,'<br />'.join(warnings))
