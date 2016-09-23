@@ -12,6 +12,7 @@ urlpatterns = (
     url(r'^members/(\d+)/$',views.member_view),
     url(r'^members/(\d+)/edit/$',views.member_edit),
     url(r'^members/(\d+)/add_resource/$',views.add_resource_access),
+    url(r'^members/(\d+)/remove_resource/(\d+)/$',views.remove_resource_access),
     url(r'^members/(\d+)/manage_keycards/$',views.member_manage_keycards),
     url(r'^resources/create/$',views.resource_create),
     url(r'^resources/(\d+)/$',views.resource_view),

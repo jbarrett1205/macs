@@ -478,6 +478,26 @@ def add_resource_access(request, member_id):
     return render(request,'macs/member_add_resource.htm',context)
     
 @permission_required('macs.change_member')
+def remove_resource_access(request, member_id, resource_id):
+    "remove member access to a resource"
+    resource_allowed = get_object_or_404(ResourceAllowed,member__id=member_id,resource__id=resource_id)    
+    context = macs_default_context({'resource_allowed':resource_allowed})    
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == MACS_DOOR_RESOURCE_ID:
+                raise ValueError("main door resource access cannot be removed - invalidate the account or keycard instead")
+            if req_id == resource_allowed.id:
+                resource_allowed.delete()
+                return redirect(resource_allowed.member)
+            else:
+                raise ValueError('Validation error.')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to remove resource access -> "+str(e))
+    
+    return render(request,'macs/member_remove_resource.htm',context)
+    
+@permission_required('macs.change_member')
 def member_manage_keycards(request, member_id):
     "edit a member account"
     member = get_object_or_404(Member,pk=member_id)    

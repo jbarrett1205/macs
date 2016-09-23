@@ -38,9 +38,10 @@
 <h2>Resources</h2>
 
 <table class="padded">
-   <tr><th>ID</th><th>Name</th><th>Description</th></tr>
+   <tr><th>ID</th><th>Name</th><th>Description</th><th>&nbsp;</th></tr>
 {% for r in member.resources.all %}
-   <tr class="{% cycle 'odd' 'even' %}"><td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.description }}</td></tr>
+   <tr class="{% cycle 'odd' 'even' %}"><td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.description }}</td>
+      <td><a href="{% url 'macs.views.remove_resource_access' member.id r.id %}">remove</a></td></tr>
 {% endfor %}
 </table>
 

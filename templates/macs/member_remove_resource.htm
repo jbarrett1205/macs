@@ -1,0 +1,21 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+
+<h1>Remove Resource Access</h1>
+
+<p class="warning">Are you sure you want to remove this access?</p>
+
+<table class="padded">
+<tr><th>Member</th><td>{{ resource_allowed.member.get_full_name }}</td></tr>
+<tr><th>Resource</th><td>{{ resource_allowed.resource.name }}</td></tr>
+</table>
+
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="id" value="{{ resource_allowed.id }}" />
+<p><input type="submit" value="Remove Access" />
+   <span style="padding-left:15px;"><a href="{% url 'macs.views.member_view' resource_allowed.member.id %}">Cancel</a></span></p>
+</form>
+
+{% endblock content %}
