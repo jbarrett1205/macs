@@ -520,7 +520,7 @@ def add_resource_access(request, member_id):
             d = form.cleaned_data
             for r in avail_rsc:
                 n = 'resource_%d'%r.id
-                if n in d and d[n] != '':
+                if n in d and d[n]:
                     ra = ResourceAllowed(member=member,resource=r,trainer=d['trainer'],comment=d['comment'])
                     ra.save()
                     _log_activity(request,ra,'create','member [%s] assigned access to resource [%s]'%(ra.member.get_full_name(),ra.resource.name))
