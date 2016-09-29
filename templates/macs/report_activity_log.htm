@@ -1,0 +1,29 @@
+{% extends "macs/base.htm" %}
+
+{% block content %}
+<h1>Admin Activity Log</h1>
+
+<p>All admin activity in the MACS system is logged. The last 90 days worth are
+available here.</p>
+
+<p><a href="{{ request.path }}?csv=t">Download</a> (CSV format)</p>
+
+{% with page.paginator.count as n %}
+    {% if n %}
+        <table class="fullwidth padded">
+          <tr><th>Timestamp</th><th>User</th><th>Action</th><th>Model</th><th>Model ID</th><th>Details</th></tr>
+        {% for x in page.object_list %}
+          <tr class="{% cycle 'odd' 'even' %}"><td>{{ x.timestamp }}</td><td>{{ x.user }}</td><td>{{ x.action }}</td>
+		     <td>{{ x.model_name }}</td><td>{{ x.model_id }}</td><td>{{ x.details|default:"&nbsp;" }}</td></tr>
+        {% endfor %}
+        </table>
+        
+      {% include "macs/snippet_pagination.htm" %}
+      
+    {% else %}
+       <p class="note">Nothing logged.</p>
+    {% endif %}
+{% endwith %}
+
+
+{% endblock content %}

@@ -25,6 +25,7 @@ urlpatterns = (
     url(r'^keycards/(\d+)/unassign/$',views.keycard_unassign),
     url(r'^keycards/upload/$',views.keycard_csv_upload),
     url(r'^reports/access_log/$',views.report_access_log),
+    url(r'^reports/activity_log/$',views.report_activity_log),
     url(r'^schedule/$',views.schedule_show),
     url(r'^schedule/daily/add/$',views.schedule_add_daily),
     url(r'^schedule/daily/(\d+)/edit/$',views.schedule_edit_daily),

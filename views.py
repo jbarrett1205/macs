@@ -20,8 +20,9 @@ import datetime
 import csv as csv_module
 import re
 from StringIO import StringIO
+import logging
 
-from .models import Member, Keycard, Resource, ResourceAllowed, ResourceAccessLog, DailySchedule, ScheduleException
+from .models import Member, Keycard, Resource, ResourceAllowed, ResourceAccessLog, DailySchedule, ScheduleException, ActivityLog
 from .local_settings import *
 
 # denied access reason codes
@@ -138,6 +139,33 @@ def _schedule_allowed(member):
     
     # couldn't match to a daily schedule window
     return False
+
+def _log_activity(request, model, action, details=''):
+    "create a log of activity performed in the MACS system"
+    try:
+        user = request.user
+        id = model.id
+        
+        if id is None:  
+            raise ValueError("model ID is not set (model not saved?)")
+        
+        if action not in ('create','modify','delete','assign'):
+            raise ValueError("invalid 'action'")
+        
+        data = {
+            'user':user,
+            'model_name':model._meta.model_name,
+            'model_id':id,
+            'action':action,
+            'details':details,    
+        }
+        log = ActivityLog(**data)
+        log.save()
+    
+    except Exception as e:
+        # do something to log the issue
+        log = logging.getLogger('macs.log_activity')
+        log.error('activity log error => %s'%e)
     
 
 ###########################################################################################################
@@ -383,6 +411,7 @@ def member_create(request):
                     pw += random.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
                 member.set_password(pw)
                 member.save()
+                _log_activity(request,member,'create','name = [%s], id = [%d], expires = [%s]'%(member.get_full_name(),member.id,member.expires.strftime('%Y/%m/%d')))
                 
                 # create default access to the "door" resource
                 ra = ResourceAllowed(member=member,resource=door,trainer='n/a')
@@ -395,11 +424,14 @@ def member_create(request):
                     # create a new keycard and attach the member to it
                     keycard = Keycard(number=keycard_data['number'],member=member,active=True)
                     keycard.save()                                    
+                    _log_activity(request,keycard,'create','number = [%s], id = [%d]'%(keycard.number,keycard.id))
+                    _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
                 elif action == 2:
                     # keycard selected, attach the member to it
                     keycard = keycard_data['select_keycard']
                     keycard.member = member
                     keycard.save()
+                    _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
                 
                 return redirect(member)
     else:
@@ -434,7 +466,12 @@ def member_edit(request, member_id):
         form = CreateEditMemberForm(request.POST,request.FILES,instance=member)
     
         if form.is_valid():
-            form.save()
+            if form.has_changed():
+                member = form.save()
+                extra = ''
+                if 'expires' in form.changed_data:
+                    extra = ' -> new expires = [%s]'%member.expires.strftime('%Y/%m/%d')
+                _log_activity(request,member,'modify','changed fields: %s'%(', '.join(form.changed_data))+extra)
             return redirect(member)
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')
@@ -453,25 +490,44 @@ def add_resource_access(request, member_id):
     context = macs_default_context({'member':member})
     
     already_have_resource_ids = list(x.resource.id for x in ResourceAllowed.objects.filter(member__id=member.id))
-    qs = Resource.objects.all().exclude(id__in=already_have_resource_ids)
+    avail_rsc = list(Resource.objects.all().exclude(id__in=already_have_resource_ids))
     
     class AddResourceAccessForm(djforms.Form):
         "form to add a resource to a member"
         
-        resource = djforms.ModelChoiceField(queryset=qs)
+        def __init__(self, avail_resources, *args, **kwargs):
+            "initializer"
+            super(AddResourceAccessForm,self).__init__(*args,**kwargs)
+            self.resource_field_names = []
+            for r in avail_resources:
+                n = 'resource_%d'%r.id
+                self.fields[n] = djforms.BooleanField(label=r.name,required=False,initial=False)
+                self.resource_field_names.append(n)
+            
         trainer = djforms.CharField(max_length=64)
         comment = djforms.CharField(max_length=255,required=False)
         
+        def get_resource_fields(self):
+            "return the resource fields in a list so that they can be iterated over in the display template"
+            r = []
+            for n in self.resource_field_names:
+                r.append(self[n])            
+            return r
+        
     if request.method == 'POST':
-        form = AddResourceAccessForm(request.POST,request.FILES)
+        form = AddResourceAccessForm(avail_rsc,request.POST,request.FILES)
         if form.is_valid():
             d = form.cleaned_data
-            ra = ResourceAllowed(member=member,resource=d['resource'],trainer=d['trainer'],comment=d['comment'])
-            ra.save()
+            for r in avail_rsc:
+                n = 'resource_%d'%r.id
+                if n in d and d[n] != '':
+                    ra = ResourceAllowed(member=member,resource=r,trainer=d['trainer'],comment=d['comment'])
+                    ra.save()
+                    _log_activity(request,ra,'create','member [%s] assigned access to resource [%s]'%(ra.member.get_full_name(),ra.resource.name))
             
             return redirect(member)
     else:
-        form = AddResourceAccessForm()
+        form = AddResourceAccessForm(avail_rsc)
         
     context['form'] = form
     
@@ -488,6 +544,7 @@ def remove_resource_access(request, member_id, resource_id):
             if req_id == MACS_DOOR_RESOURCE_ID:
                 raise ValueError("main door resource access cannot be removed - invalidate the account or keycard instead")
             if req_id == resource_allowed.id:
+                _log_activity(request,resource_allowed,'delete','member [%s] access revoked to resource [%s]'%(resource_allowed.member.get_full_name(),resource_allowed.resource.name))
                 resource_allowed.delete()
                 return redirect(resource_allowed.member)
             else:
@@ -512,11 +569,14 @@ def member_manage_keycards(request, member_id):
                 # create a new keycard and attach the member to it
                 keycard = Keycard(number=keycard_data['number'],member=member,active=True)
                 keycard.save()                                    
+                _log_activity(request,keycard,'create','number = [%s], id = [%d]'%(keycard.number,keycard.id))
+                _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
             elif action == 2:
                 # keycard selected, attach the member to it
                 keycard = keycard_data['select_keycard']
                 keycard.member = member
                 keycard.save()
+                _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
             
             return redirect(request.get_full_path())
     else:
@@ -555,6 +615,7 @@ def keycard_set_inactive(request, key_id):
             if req_id == int(key_id):
                 keycard.active = False
                 keycard.save()
+                _log_activity(request,keycard,'modify','number = [%s], active = [False]'%keycard.number)
                 return redirect(keycard)
             else:
                 raise ValueError('Validation error.')
@@ -572,6 +633,7 @@ def keycard_set_active(request, key_id):
             if req_id == int(key_id):
                 keycard.active = True
                 keycard.save()
+                _log_activity(request,keycard,'modify','number = [%s], active = [True]'%keycard.number)
                 return redirect(keycard)
             else:
                 raise ValueError('Validation error.')
@@ -587,8 +649,10 @@ def keycard_unassign(request, key_id):
         try:
             req_id = int(request.POST['id'])
             if req_id == int(key_id):
+                member = keycard.member
                 keycard.member = None
                 keycard.save()
+                _log_activity(request,keycard,'modify','unassigned keycard number [%s] from member [%s]'%(keycard.number,member.get_full_name()))
                 return redirect(keycard)
             else:
                 raise ValueError('Validation error.')
@@ -627,6 +691,7 @@ def keycard_csv_upload(request):
                     try:
                         keycard = Keycard(number=row[0],comment=row[1],active=True)
                         keycard.save()           
+                        _log_activity(request,keycard,'create','number = [%s], id = [%d] (imported from CSV)'%(keycard.number,keycard.id))
                         new_card_count += 1
                     except Exception as e:
                         warnings.append('Row %d: could not create keycard -> %s'%(i+1,e))
@@ -667,6 +732,7 @@ def resource_create(request):
         if form.is_valid():
             # create the resource
             resource = form.save()
+            _log_activity(request,resource,'create','name = [%s]'%resource.name)
             return redirect(resource)
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
@@ -705,7 +771,9 @@ def resource_edit(request, resource_id):
         form = CreateEditResourceForm(request.POST,request.FILES,instance=resource)
     
         if form.is_valid():
-            resource = form.save()
+            if form.has_changed():
+                resource = form.save()
+                _log_activity(request,resource,'modify','changed fields: %s'%(', '.join(form.changed_data)))
             return redirect(resource)
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')
@@ -754,6 +822,33 @@ def report_access_log(request):
     context = macs_default_context({'page':p})
     return render(request,'macs/report_access_log.htm',context)
     
+@permission_required('macs.change_member')
+def report_activity_log(request):
+    "view the admin activity log"
+    ninety_days_ago = timezone.now() - datetime.timedelta(days=90)
+    qs = ActivityLog.objects.filter(timestamp__gt=ninety_days_ago)
+    
+    if request.GET.get('csv',''):
+        # CSV file download
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="activity-log-'+datetime.datetime.now().strftime('%Y%m%d')+'.csv"'
+        writer = csv_module.writer(response)
+        writer.writerow(['Timestamp','User','Action','Model','Model ID','Details'])
+        for log in qs:
+            fields = [log.timestamp.strftime('%Y/%m/%d %H:%M:%S'),log.user.get_full_name(),log.action,log.model_name,str(log.model_id),log.details]
+            writer.writerow([f.encode('cp1252','replace') for f in fields])      
+        return response    
+    
+    # normal response
+    pager = Paginator(qs,100)
+    page = request.GET.get('p','1')
+    try:
+        p = pager.page(int(page))
+    except Exception:
+        p = pager.page(1)
+        
+    context = macs_default_context({'page':p})
+    return render(request,'macs/report_activity_log.htm',context)
     
 ###########################################################################################################
 ###########################################################################################################
@@ -809,6 +904,7 @@ def schedule_add_daily(request):
         if form.is_valid():
             # create the schedule
             schedule = form.save()
+            _log_activity(request,schedule,'create','day = [%d], start = [%s], end = [%s]'%(schedule.day,schedule.start_time.strftime('%H:%M:%S'),schedule.end_time.strftime('%H:%M:%S')))
             return redirect('macs.views.schedule_show')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
@@ -829,7 +925,9 @@ def schedule_edit_daily(request, sch_id):
         form = AddEditDailyScheduleForm(request.POST,request.FILES,instance=schedule)    
         if form.is_valid():
             # create the schedule
-            schedule = form.save()
+            if form.has_changed():
+                schedule = form.save()
+                _log_activity(request,schedule,'modify','changed fields: %s'%(', '.join(form.changed_data)))
             return redirect('macs.views.schedule_show')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
@@ -850,6 +948,7 @@ def schedule_remove_daily(request, sch_id):
         try:
             del_id = int(request.POST['id'])
             if del_id == int(sch_id):
+                _log_activity(request,schedule,'delete')
                 schedule.delete()
                 return redirect('macs.views.schedule_show')
             else:
@@ -870,6 +969,7 @@ def schedule_add_exception(request):
         if form.is_valid():
             # create the schedule
             schedule = form.save()
+            _log_activity(request,schedule,'create','date = [%s], start = [%s], end = [%s], open=[%s]'%(schedule.date.strftime('%Y/%m/%d'),schedule.start_time.strftime('%H:%M:%S'),schedule.end_time.strftime('%H:%M:%S'),schedule.open))
             return redirect('macs.views.schedule_show')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
@@ -890,7 +990,9 @@ def schedule_edit_exception(request, sch_id):
         form = AddEditScheduleExceptionForm(request.POST,request.FILES,instance=schedule)    
         if form.is_valid():
             # create the schedule
-            schedule = form.save()
+            if form.has_changed():
+                schedule = form.save()
+                _log_activity(request,schedule,'modify','changed fields: %s'%(', '.join(form.changed_data)))
             return redirect('macs.views.schedule_show')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
@@ -911,6 +1013,7 @@ def schedule_remove_exception(request, sch_id):
         try:
             del_id = int(request.POST['id'])
             if del_id == int(sch_id):
+                _log_activity(request,schedule,'delete')
                 schedule.delete()
                 return redirect('macs.views.schedule_show')
             else:
@@ -920,17 +1023,5 @@ def schedule_remove_exception(request, sch_id):
 
     context = macs_default_context({'schedule':schedule})
     return render(request,'macs/schedule_remove_exception.htm',context)
-
-
-
-
-
-
-
-
-
-    
-    
-    
     
     

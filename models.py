@@ -56,7 +56,7 @@ class Keycard(models.Model):
     number = models.CharField(max_length=64,unique=True,help_text="Keycard ID String (hexadecimal)",validators=[keycard_number_ok])
     member = models.ForeignKey(Member,null=True,blank=True,on_delete=models.SET_NULL,help_text="Member assigned to this card")
     active = models.BooleanField(default=True,blank=True,help_text="keycard is active")
-    comment = models.CharField(max_length=128,help_text="optional comment")
+    comment = models.CharField(max_length=128,blank=True,help_text="optional comment")
     
     def __unicode__(self):
         return self.number + ' (' + self.comment.strip() + ')'
@@ -129,6 +129,9 @@ class ActivityLog(models.Model):
     action = models.CharField(max_length=32)
     details = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ('-timestamp',)
+        
 class DailySchedule(models.Model):
     """store the daily schedule for the makerspace to be open
     

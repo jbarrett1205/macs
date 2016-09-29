@@ -6,13 +6,19 @@
 
 <form method="post">
 {% csrf_token %}
+
+<p class="form_errors">{{ form.non_field_errors }}</p>
+
 <table class="padded">
-<tr><th>{{ form.resource.label }}</th><td>{{ form.resource }}</td><td>{{ form.resource.errors }}</td></tr>
 <tr><th>{{ form.trainer.label }}</th><td>{{ form.trainer }}</td><td>{{ form.trainer.errors }}</td></tr>
 <tr><th>{{ form.comment.label }} (optional)</th><td>{{ form.comment }}</td><td>{{ form.comment.errors }}</td></tr>
+<tr><th colspan="2">Available Resources</th><td></td></tr>
+{% for r in form.get_resource_fields %}
+   <tr><th>{{ r.label }}</th><td class="acenter">{{ r }}</td><td>{{ r.errors }}</td></tr>
+{% endfor %}
 </table>
 
-<p><input type="submit" value="Add Resource" />
+<p><input type="submit" value="Add Resource(s)" />
    <span style="padding-left:15px;"><a href="{% url 'macs.views.member_view' member.id %}">Cancel</a></span></p>
 </form>
 
