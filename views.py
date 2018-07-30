@@ -22,28 +22,10 @@ import re
 from StringIO import StringIO
 import logging
 
+from .constants import *
 from .models import Member, Keycard, Resource, ResourceAllowed, ResourceAccessLog, DailySchedule, ScheduleException, ActivityLog
-from .local_settings import *
+from . import settings
 
-# denied access reason codes
-ACCESS_DENIED_EXPIRED = 1
-ACCESS_DENIED_INACTIVE = 2
-ACCESS_DENIED_PERMISSION = 3
-ACCESS_DENIED_BAD_KEYCARD = 4
-ACCESS_DENIED_SCHEDULE = 5
-ACCESS_DENIED_KEYCARD_INACTIVE = 6
-ACCESS_DENIED_UNASSIGNED_KEYCARD = 7
-
-access_denied_reason = [
-    '',  # access allowed
-    'account expired',
-    'account inactive',
-    'permission denied',
-    'invalid keycard',
-    'makerspace closed',
-    'keycard inactive',
-    'keycard unassigned',
-]
 
 class MyJSONResponse(HttpResponse):
     "JSON response object"
@@ -90,6 +72,7 @@ def _polulate_validation_dict(resource_id, keycard_id, member, ok=False):
         'expires':'1999/01/01',
         'notok_reason':'',
         'type':'',
+        'incognito':1,
     }
     
     if member is not None:
@@ -98,6 +81,7 @@ def _polulate_validation_dict(resource_id, keycard_id, member, ok=False):
         r['user_id'] = member.username
         r['expires'] = member.expires.strftime('%Y/%m/%d')
         r['type'] = member.membership_type
+        r['incognito'] = 1 if member.incognito else 0
     
     if ok:
         r['ok'] = 1
@@ -118,7 +102,7 @@ def macs_default_context( c=None ):
 def _schedule_allowed(member):
     "check the access schedule to determine if the access should be allowed"
     # always return true for member types that are exempt from the schedule
-    if member.membership_type in MACS_MEMBER_TYPES_EXEMPT_FROM_SCHEDULE:
+    if member.membership_type in settings.MEMBER_TYPES_EXEMPT_FROM_SCHEDULE:
         return True
     
     now = datetime.datetime.now()
@@ -174,6 +158,7 @@ def _log_activity(request, model, action, details=''):
 ###########################################################################################################
 ###########################################################################################################
 
+@login_required
 def index(request):
     "landing point for MACS"
     return render(request,'macs/index.htm',macs_default_context())
@@ -207,12 +192,12 @@ def json_download_members(request, resource_id):
         if not member.is_active:
             # account inactive
             pass
-        elif (member.expires - datetime.date.today()).days < -MACS_GRACE_PERIOD_DAYS:
+        elif (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
             # account expired
             pass
         else:
             # member account is valid, add it to the list
-            # add an entry for each each keycard that is tied to the member
+            # add an entry for each keycard that is tied to the member
             for keycard in member.keycard_set.all():
                 r.append(_polulate_validation_dict(resource_id,keycard.number,member,True))
 
@@ -248,7 +233,7 @@ def json_validate_member(request, resource_id, keycard_id):
             # check that the member account is valid
             if not member.is_active:
                 why_denied = ACCESS_DENIED_INACTIVE
-            elif (member.expires - datetime.date.today()).days < -MACS_GRACE_PERIOD_DAYS:
+            elif (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
                 why_denied = ACCESS_DENIED_EXPIRED
             elif not keycard.active:
                 why_denied = ACCESS_DENIED_KEYCARD_INACTIVE       
@@ -333,7 +318,7 @@ class CreateEditMemberForm(djforms.ModelForm):
     
     class Meta:
         model = Member
-        fields = ['first_name','last_name','email','username','membership_type','expires','billing_id','comments']
+        fields = ['first_name','last_name','email','username','membership_type','expires','billing_id','incognito','comments']
 
 class CreateAssignKeycardForm(djforms.Form):
     "create a new keycard or assign an existing one"
@@ -397,9 +382,9 @@ def member_create(request):
             door = None
             try:
                 # make sure that the "door" resource exists
-                door = Resource.objects.get(pk=MACS_DOOR_RESOURCE_ID)
+                door = Resource.objects.get(pk=settings.DOOR_RESOURCE_ID)
             except Resource.DoesNotExist:
-                messages.add_message(request,messages.ERROR,'The main door resource must exist with resource id `%d`.'%MACS_DOOR_RESOURCE_ID)
+                messages.add_message(request,messages.ERROR,'The main door resource must exist with resource id `%d`.'%settings.DOOR_RESOURCE_ID)
             
             if door:
                 # create the member account
@@ -408,7 +393,7 @@ def member_create(request):
                 # the reset password functionality
                 pw = ''
                 for _ in range(20):
-                    pw += random.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+                    pw += random.choice('abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ123456789')
                 member.set_password(pw)
                 member.save()
                 _log_activity(request,member,'create','name = [%s], id = [%d], expires = [%s]'%(member.get_full_name(),member.id,member.expires.strftime('%Y/%m/%d')))
@@ -446,7 +431,15 @@ def member_create(request):
 @permission_required('macs.change_member')
 def member_list(request):
     "list all members"
-    context = macs_default_context({'members':Member.objects.all()})
+    which = request.GET.get('w','all')
+    if which == 'expired':
+        qs = Member.objects.filter(expires__lt=datetime.date.today())
+    elif which == 'active':
+        qs = Member.objects.filter(expires__gte=datetime.date.today())
+    else:
+        qs = Member.objects.all()
+        which = 'all'
+    context = macs_default_context({'members':qs,'which':which})
     return render(request,'macs/member_list.htm',context)
     
 @permission_required('macs.change_member')
@@ -468,6 +461,11 @@ def member_edit(request, member_id):
         if form.is_valid():
             if form.has_changed():
                 member = form.save()
+                if not member.is_active and member.expires > datetime.date.today():
+                    # re-activate accounts that have been disabled if the
+                    # memebership expiration date is in the future
+                    member.is_active = True
+                    member.save()
                 extra = ''
                 if 'expires' in form.changed_data:
                     extra = ' -> new expires = [%s]'%member.expires.strftime('%Y/%m/%d')
@@ -541,7 +539,7 @@ def remove_resource_access(request, member_id, resource_id):
     if request.method == 'POST':
         try:
             req_id = int(request.POST['id'])
-            if req_id == MACS_DOOR_RESOURCE_ID:
+            if req_id == settings.DOOR_RESOURCE_ID:
                 raise ValueError("main door resource access cannot be removed - invalidate the account or keycard instead")
             if req_id == resource_allowed.id:
                 _log_activity(request,resource_allowed,'delete','member [%s] access revoked to resource [%s]'%(resource_allowed.member.get_full_name(),resource_allowed.resource.name))
@@ -592,6 +590,7 @@ def member_manage_keycards(request, member_id):
 ###########################################################################################################
 ###########################################################################################################
 
+@permission_required('macs.change_member')
 def keycard_manage_all(request):
     "manage all keycards in the system"
     context = macs_default_context({
@@ -601,11 +600,13 @@ def keycard_manage_all(request):
 
     return render(request,'macs/keycard_manage_all.htm',context)
 
+@permission_required('macs.change_member')
 def keycard_manage(request, key_id):
     "manage an individual keycard"
     keycard = get_object_or_404(Keycard,pk=key_id)
     return render(request,'macs/keycard_manage.htm',macs_default_context({'keycard':keycard}))
     
+@permission_required('macs.change_member')
 def keycard_set_inactive(request, key_id):
     "set a keycard to be inactive"
     keycard = get_object_or_404(Keycard,pk=key_id)
@@ -624,6 +625,7 @@ def keycard_set_inactive(request, key_id):
         
     return render(request,'macs/keycard_set_inactive.htm',macs_default_context({'keycard':keycard}))
 
+@permission_required('macs.change_member')
 def keycard_set_active(request, key_id):
     "set a keycard to be active"
     keycard = get_object_or_404(Keycard,pk=key_id)
@@ -642,6 +644,7 @@ def keycard_set_active(request, key_id):
         
     return render(request,'macs/keycard_set_active.htm',macs_default_context({'keycard':keycard}))
 
+@permission_required('macs.change_member')
 def keycard_unassign(request, key_id):
     "unassign a keycard from a member"
     keycard = get_object_or_404(Keycard,pk=key_id)
@@ -666,6 +669,7 @@ class KeycardCsvUploadForm(djforms.Form):
     "form for uploading keycards from CSV"
     csv_file = djforms.FileField()
     
+@permission_required('macs.change_member')
 def keycard_csv_upload(request):
     "upload a batch of keycards in a CSV file"
     
@@ -720,7 +724,7 @@ class CreateEditResourceForm(djforms.ModelForm):
     
     class Meta:
         model = Resource
-        fields = ['name','description','secret','cost_per_hour']
+        fields = ['name','description','secret','cost_per_hour','admin_url']
     
 
 @permission_required('macs.change_resource')
@@ -744,7 +748,7 @@ def resource_create(request):
     context = macs_default_context({'form': form})
     return render(request,'macs/resource_create.htm',context)
     
-@permission_required('macs.change_resource')
+@login_required
 def resource_list(request):
     "list all resources"
     context = macs_default_context({'resources':Resource.objects.all()})
@@ -813,7 +817,7 @@ def report_access_log(request):
     
     # normal response
     pager = Paginator(qs,100)
-    page = request.GET.get('p','1')
+    page = request.GET.get('page','1')
     try:
         p = pager.page(int(page))
     except Exception:
@@ -841,7 +845,7 @@ def report_activity_log(request):
     
     # normal response
     pager = Paginator(qs,100)
-    page = request.GET.get('p','1')
+    page = request.GET.get('page','1')
     try:
         p = pager.page(int(page))
     except Exception:
@@ -882,7 +886,7 @@ class AddEditScheduleExceptionForm(djforms.ModelForm):
             raise djforms.ValidationError("'end_time' must be greater than 'start_time'")
         return self.cleaned_data
     
-@permission_required('macs.change_member')
+@login_required
 def schedule_show(request):
     "show the current schedule"
     today = datetime.date.today()

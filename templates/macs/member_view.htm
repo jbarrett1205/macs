@@ -1,6 +1,6 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 
 <ul>
 </ul>
@@ -14,6 +14,7 @@
 <tr class="even"><th>User ID</th><td>{{ member.username }}</td></tr>
 <tr class="odd"><th>Email</th><td>{{ member.email }}</td></tr>
 <tr class="even"><th>Expires</th><td>{{ member.expires }}</td></tr>
+<tr class="odd"><th>Incognito</th><td>{{ member.incognito }}</td></tr>
 </table>
 
 <p><span class="boldface">Comments:</span><br />
@@ -47,4 +48,4 @@
 
 <p><a href="{% url 'macs.views.add_resource_access' member.id %}">Add resources</a></p>  
 
-{% endblock content %}
+{% endblock macs_content %}

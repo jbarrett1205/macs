@@ -1,12 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.conf import settings
 from django.core.exceptions import ValidationError
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
-import re
+import re, datetime
+
+from .constants import access_denied_reason
 
 MEMBERSHIP_TYPES = [
     ('individual','Individual'),
@@ -28,6 +29,8 @@ class Member(User):
     comments = models.TextField(blank=True)
     # try to match the amherst rec account records to the makerspace account
     billing_id = models.CharField(max_length=255,blank=True,help_text="ID to help with future direct link to Amherst Rec billing")
+    # mark certain members as incognito, so the doorbot doesn't tweet them
+    incognito = models.BooleanField(blank=True,default=False)
         
     def __unicode__(self):
         return u'%s %s'%(self.first_name,self.last_name)
@@ -41,6 +44,11 @@ class Member(User):
         for card in self.keycard_set.all():
             r.append(card.number)
         return r
+    
+    @property
+    def is_expired(self):
+        "check if account is expired"
+        return bool(self.expires < datetime.date.today())
 
     class Meta:
         ordering = ('last_name','first_name')
@@ -78,6 +86,7 @@ class Resource(models.Model):
     description = models.CharField(max_length=255,blank=True,help_text="additional information about the resource")
     secret = models.CharField(max_length=32,blank=True,help_text="resource secret key")
     cost_per_hour = models.FloatField(blank=True,default=0.0,help_text="cost per hour of use")
+    admin_url = models.URLField(blank=True,help_text="URL for performing admin activity on the resource")
         
     def __unicode__(self):
         return u'%d: %s'%(self.id,self.name)
@@ -109,6 +118,13 @@ class ResourceAccessLog(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     allowed = models.BooleanField(blank=True,default=False)
     reason_code = models.IntegerField()
+    
+    def reason_text(self):
+        r = self.reason_code
+        if r >= 0 and r < len(access_denied_reason):
+            return access_denied_reason[r]
+        else:
+            return 'unknown reason'
             
     class Meta:
         ordering = ('-timestamp',)

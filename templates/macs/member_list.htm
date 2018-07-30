@@ -1,29 +1,33 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 
 <h1>Makerspace Members</h1>
 
-<p>All members are listed here (including expired ones, for the moment - need to have an option to enable/disable expired).</p>
+<p>Currently showing <b>{{ which }}</b> members.</p>
 
 <ul>
-  <li><a href="{% url 'macs.views.member_create' %}">Create a new member</a></li>
+{% if which != 'all' %}<li><a href="{{ request.path }}?w=all">Show All Members</a></li>{% endif %}
+{% if which != 'active' %}<li><a href="{{ request.path }}?w=active">Show Only Active Members</a></li>{% endif %}
+{% if which != 'expired' %}<li><a href="{{ request.path }}?w=expired">Show Only Expired Members</a></li>{% endif %}
 </ul>
 
 {% if members %}
 	<table class="fullwidth padded">
-	<tr><th>Last Name</th><th>First Name</th><th>Type</th><th>Keycard(s)</th><th>Expires</th><th>&nbsp;</th></tr>
+	<tr><th>Last Name</th><th>First Name</th><th>Type</th><th>Keycard(s)</th><th>Expires</th><th>&nbsp;</th><th>&nbsp;</th></tr>
 	{% for m in members %}
 		<tr class="{% cycle 'odd' 'even' %}">
 		   <td>{{ m.last_name }}</td><td>{{ m.first_name }}</td><td>{{ m.get_membership_type_display }}</td>
-		   <td>{{ m.get_keycard_list|join:" / "|default:"&nbsp;" }}</td><td>{{ m.expires }}</td>
-		   <td><a href="{% url 'macs.views.member_view' m.id %}">details</a></td>
+		   <td>{{ m.get_keycard_list|join:" / "|default:"&nbsp;" }}</td>
+		   <td><span class="{% if m.is_expired %}warning{% endif %}">{{ m.expires }}</span></td>
+		   <td class="acenter"><a href="{% url 'macs.views.member_view' m.id %}"><img class="macs-icon" src="{{ STATIC_URL }}macs/view-32x32.png" alt="view" /></a></td>
+		   <td class="acenter"><a href="{% url 'macs.views.member_edit' m.id %}"><img class="macs-icon" src="{{ STATIC_URL }}macs/edit-32x32.png" alt="edit" /></a></td>
 		   </tr>
 	{% endfor %} 
 	</table>
 
 {% else %}
-  <p class="note">No members yet.</p>
+  <p class="note">Nothing to show.</p>
 {% endif %}
 
-{% endblock content %}
+{% endblock macs_content %}

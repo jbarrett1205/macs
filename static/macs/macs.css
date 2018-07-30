@@ -1,0 +1,71 @@
+
+.macs-navbar {
+	padding:4px;
+}
+
+.macs-content {
+	padding:10px;
+}
+
+#macs-nav-toggle { display:block; padding:5px; font-weight:bold; font-size:20px; }
+
+#macs-nav {
+	float:left;
+	margin-top:10px;
+	position:absolute;
+	height:0px;
+	overflow:hidden;
+	text-align:left;
+	z-index:99;
+	background-color:#ffffff;
+	-moz-box-shadow:6px 6px 3px #888888;
+	-webkit-box-shadow:6px 6px 3px #888888;
+	box-shadow:6px 6px 3px #888888;
+	-moz-transition:height 0.4s;
+	-webkit-transition:height 0.4s;
+	transition:height 0.4s;
+}
+
+#macs-nav.macs-menu-expanded { height:auto; }
+
+/* style for items in the messages area */
+#macs-message-area p { margin:1em 0.5em; padding:0.3em; }
+#macs-message-area p.debug { border:1px dotted gray; font-style:italic; background-color:#f0f0f0; }
+#macs-message-area p.info { border:1px solid gray; background-color:#f0f0f0; }
+#macs-message-area p.success { border:2px solid #00ff00; color:#00ff00; background-color:#d0ffd0; font-weight:bold; }
+#macs-message-area p.warning { border:2px solid #ff8800; color:#ff8800; background-color:#ffffaa; font-weight:bold; }
+#macs-message-area p.error { border:2px solid #ff0000; color:#ff0000; background-color:#ff8888; font-weight:bold; }
+
+
+/* add some style to form components */
+
+.macs-content input[type=text], .macs-content input[type=password],
+.macs-content input[type=email], .macs-content input[type=number],
+.macs-content input[type=url]  {
+   padding:4px 6px;
+}
+
+.macs-content input[type=submit] {
+   color:#ffffff;
+   background-color:#4caf50;
+   font-weight:bold;
+   padding:5px 8px;
+}
+
+.macs-content input[type=submit]:hover {
+   -moz-box-shadow:3px 3px 3px #888888;
+   -webkit-box-shadow:3px 3px 3px #888888;
+   box-shadow: 3px 3px 3px #888888;
+}
+
+/* menu styling */
+
+.macs-navbar nav ul, .macs-navbar nav li { display:block; float:none }
+.macs-navbar nav li>a, .macs-navbar nav li>span { padding:3px 4px; font-size:18px; text-transform:uppercase; }
+.macs-navbar nav li>ul>li>a { padding-left:14px; } 
+.macs-navbar nav li>span { display:block; }
+
+/* other styles */
+
+.macs-icon { width:16px; height:16px; }
+

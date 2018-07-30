@@ -1,6 +1,6 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 <h1>Resource Access Log</h1>
 
 <p>All resource access requests that are received by the server are logged. The last 90 days worth are
@@ -15,7 +15,7 @@ available here.</p>
         {% for x in page.object_list %}
           <tr class="{% cycle 'odd' 'even' %}"><td>{{ x.timestamp }}</td><td>{{ x.resource.id }}</td><td>{{ x.keycard }}</td>
 		     <td>{{ x.member.get_full_name }}</td><td>{% if x.allowed %}Yes{% else %}<span style="color:#ff0000;font-weight:bold;">No</span>{% endif %}</td>
-			 <td>{% if x.allowed %}&nbsp;{% else %}{{ x.reason_code }}{% endif %}</td></tr>
+			 <td>{{ x.reason_text|default:'&nbsp;' }}</td></tr>
         {% endfor %}
         </table>
         
@@ -27,4 +27,4 @@ available here.</p>
 {% endwith %}
 
 
-{% endblock content %}
+{% endblock macs_content %}

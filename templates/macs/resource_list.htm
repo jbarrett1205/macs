@@ -1,14 +1,10 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 
 <h1>Resource Listing</h1>
 
 <p>Resources are used to provide access to various Makerspace assets.</p>
-
-<ul>
-  <li><a href="{% url 'macs.views.resource_create' %}">Create a new resource</a></li>
-</ul>
 
 {% if resources %}
 	<table class="padded">
@@ -24,4 +20,4 @@
   <p class="note">No resources yet.</p>
 {% endif %}
 
-{% endblock content %}
+{% endblock macs_content %}

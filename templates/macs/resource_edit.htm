@@ -1,6 +1,6 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 <h1>Edit Resource</h1>
 
 <p>Resources are used to allow access to certain Makerspace assets. Every member has the main door
@@ -14,6 +14,10 @@ when HTTP validation requests are sent to the server.  If left blank, no validat
 members can be informed how much in consumables (3D printer material, welding wire/gases, etc) they have used so we
 can solicit payments/donations. This field is in dollars.</p>
 
+<p>The &quot;Admin url&quot; field is an optional field that can be used to create a link to the remote administation
+address that can be used to perform admin actions on the resource. If it is used, it must be a valid URL
+(something like &quot;http://192.168.1.100/admin&quot;).</p>
+
 <form method="post">
 {% csrf_token %}
 
@@ -24,6 +28,7 @@ can solicit payments/donations. This field is in dollars.</p>
 <tr><th>{{ form.description.label }}</th><td>{{ form.description }}</td><td>{{ form.description.errors }}</td></tr>
 <tr><th>{{ form.secret.label }}</th><td>{{ form.secret }}</td><td>{{ form.secret.errors }}</td></tr>
 <tr><th>{{ form.cost_per_hour.label }}</th><td>{{ form.cost_per_hour }}</td><td>{{ form.cost_per_hour.errors }}</td></tr>
+<tr><th>{{ form.admin_url.label }}</th><td>{{ form.admin_url }}</td><td>{{ form.admin_url.errors }}</td></tr>
 </table>
 
 <p><input type="submit" value="Save Changes" />
@@ -31,4 +36,4 @@ can solicit payments/donations. This field is in dollars.</p>
 
 </form>
 
-{% endblock content %}
+{% endblock macs_content %}

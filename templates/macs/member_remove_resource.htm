@@ -1,6 +1,6 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 
 <h1>Remove Resource Access</h1>
 
@@ -18,4 +18,4 @@
    <span style="padding-left:15px;"><a href="{% url 'macs.views.member_view' resource_allowed.member.id %}">Cancel</a></span></p>
 </form>
 
-{% endblock content %}
+{% endblock macs_content %}

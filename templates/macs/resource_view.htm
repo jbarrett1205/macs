@@ -1,6 +1,6 @@
 {% extends "macs/base.htm" %}
 
-{% block content %}
+{% block macs_content %}
 
 <h1>Resource Info</h1>
 
@@ -10,6 +10,7 @@
 <tr class="odd"><th>Description</th><td>{{ resource.description }}</td></tr>
 <tr class="even"><th>Secret Key</th><td>{{ resource.secret }}</td></tr>
 <tr class="odd"><th>Cost Per Hour</th><td>{{ resource.cost_per_hour }}</td></tr>
+<tr class="even"><th>Admin URL</th><td>{% if resource.admin_url %}<a href="{{ resource.admin_url }}" target="_blank">{{ resource.admin_url }}</a> (opens in new tab){% else %}&lt;not set&gt;{% endif %}</td></tr>
 </table>
 
 <p><a href="{% url 'macs.views.resource_edit' resource.id %}">Edit resource info</a></p>
@@ -24,4 +25,4 @@
   {% endfor %}
 </table>
 
-{% endblock content %}
+{% endblock macs_content %}
