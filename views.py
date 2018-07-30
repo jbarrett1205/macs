@@ -741,7 +741,7 @@ def keycard_csv_upload(request):
                         continue
                     
                     try:
-                        keycard = Keycard(number=row[0].lower(),comment=row[1],active=True)
+                        keycard = Keycard(number=row[0].upper(),comment=row[1],active=True)
                         keycard.save()           
                         _log_activity(request,keycard,'create','number = [%s], id = [%d] (imported from CSV)'%(keycard.number,keycard.id))
                         new_card_count += 1
@@ -775,7 +775,7 @@ class KeycardBatchCreateForm(djforms.Form):
     def clean_number(self):
         value = self.cleaned_data['number']
         keycard_number_ok(value)
-        return value.lower()
+        return value.upper()
     
 @permission_required('macs.change_member')
 def keycard_batch_create(request):
