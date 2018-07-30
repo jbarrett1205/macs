@@ -4,6 +4,12 @@
 
 <h1>Resource Info</h1>
 
+{% if resource.locked %}
+<p class="critical">This resource is currently locked! To unlock it, please ensure it is in safe working order
+first then use the <a href="{% url 'macs.views.resource_unlock' resource.id %}">Unlock Resource</a> link
+to unlock it.</p>
+{% endif %}
+
 <table class="padded">
 <tr class="odd"><th>ID</th><td>{{ resource.id }}</td></tr>
 <tr class="even"><th>Name</th><td>{{ resource.name }}</td></tr>
@@ -13,7 +19,14 @@
 <tr class="even"><th>Admin URL</th><td>{% if resource.admin_url %}<a href="{{ resource.admin_url }}" target="_blank">{{ resource.admin_url }}</a> (opens in new tab){% else %}&lt;not set&gt;{% endif %}</td></tr>
 </table>
 
-<p><a href="{% url 'macs.views.resource_edit' resource.id %}">Edit resource info</a></p>
+<ul>
+  <li><a href="{% url 'macs.views.resource_edit' resource.id %}">Edit resource info</a></li>
+{% if resource.locked %}
+  <li><a href="{% url 'macs.views.resource_unlock' resource.id %}">Unlock Resource</a></li>
+{% else %}
+  <li><a href="{% url 'macs.views.resource_lock' resource.id %}">Lock Resource</a> (prevents member access)</li>
+{% endif %}
+</ul>
 
 <h2>Members with Access</h2>
 

@@ -8,6 +8,7 @@ ACCESS_DENIED_BAD_KEYCARD = 4
 ACCESS_DENIED_SCHEDULE = 5
 ACCESS_DENIED_KEYCARD_INACTIVE = 6
 ACCESS_DENIED_UNASSIGNED_KEYCARD = 7
+ACCESS_DENIED_RESOURCE_LOCKED = 8
 
 access_denied_reason = [
     '',  # access allowed
@@ -18,4 +19,5 @@ access_denied_reason = [
     'makerspace closed',
     'keycard inactive',
     'keycard unassigned',
+    'resource locked',
 ]

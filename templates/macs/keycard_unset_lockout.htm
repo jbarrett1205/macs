@@ -2,9 +2,9 @@
 
 {% block macs_content %}
 
-<h1>Set Keycard Active</h1>
+<h1>Remove Keycard Lockout Function</h1>
 
-<p class="warning">Are you sure that you want to set this keycard to be active?</p>
+<p class="warning">Are you sure you want to remove &quot;lockout&quot; functionality from this card?</p>
 
 <table class="padded">
 <tr><th>Keycard ID</th><td>{{ keycard.number }}</td></tr>
@@ -14,7 +14,7 @@
 <form method="post">
 {% csrf_token %}
 <input type="hidden" name="id" value="{{ keycard.id }}" />
-<p><input type="submit" value="Set Active" />
+<p><input type="submit" value="Remove Lockout Functionality" />
    <span style="padding-left:15px;"><a href="{% url 'macs.views.keycard_manage' keycard.id %}">Cancel</a></span></p>
 </form>
 

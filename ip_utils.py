@@ -1,5 +1,31 @@
 import re
+from functools import wraps
+from django.core.exceptions import PermissionDenied
+from . import settings
 
+# allowed networks
+_ALLOWED_NETWORKS = []
+
+def macs_check_restricted_request(request):
+    "check that the request should be allowed"
+    try:
+        remote_ip = request.META['REMOTE_ADDR']
+        for nw in _ALLOWED_NETWORKS:
+            if nw.in_network(remote_ip):
+                return
+    except Exception:
+        pass
+    
+    raise PermissionDenied("invalid network")
+
+def macs_restrict_request(func):
+    "decorator to check the request object for certain views"
+    @wraps(func)
+    def check_req(*args,**kwargs):
+        # Django Request object is in args[0]
+        macs_check_restricted_request(args[0])
+        return func(*args,**kwargs)
+    return check_req
 
 
 class IPv4Network(object):
@@ -28,14 +54,16 @@ class IPv4Network(object):
         
     def in_network(self, ipaddr):
         "check if the specified IP is in the network"
-        if not self._ip_ok.match(ipaddr):
-            raise ValueError("'%s' is not a valid IPv4 address"%ipaddr)
-            
-        bin_ip = self._ip_to_bin(ipaddr)
-        bin_net = bin_ip & self._bin_mask
+        try:
+            bin_ip = self._ip_to_bin(ipaddr)
+            bin_net = bin_ip & self._bin_mask
+        except Exception:
+            return False
         
         if bin_net == self._bin_network:
             return True
+        # else:
+            # print("me: {} - test {} -> {:b} != {:b}".format(self._ip,ipaddr,self._bin_network,bin_net))
         
         return False
     
@@ -49,7 +77,7 @@ class IPv4Network(object):
         and converts it to a 32-bit unsigned integer
         
         """
-        x = map(int,ipaddr.split('.'))
+        x = list(map(int,ipaddr.split('.')))
         if len(x) != 4:
             raise ValueError("IPv4 address does not have 4 parts -> '%s'"%ipaddr)
         
@@ -65,20 +93,11 @@ class IPv4Network(object):
         """takes a netmask specifier and converts it to a 32-bit integer
         
         """
+        mask = int(mask)
         if mask < 8 or mask > 32:
             raise ValueError("the network mask value must be 8 to 32")
         
-        v = 0
-        for i in xrange(32):
-            v = v << 1
-            if i < mask:
-                v += 1
-        
-        return v
-            
-        
-        
-    
+        return (2**mask-1)<<(32-mask)
     
     
 def compute_networks_and_masks( allowed_networks ):
@@ -99,6 +118,7 @@ def compute_networks_and_masks( allowed_networks ):
             raise ValueError("could not convert '%s' to a valid IPv4 network"%nw)
     
     return out
-    
-    
+
+# load up _ALLOWED_NETWORKS
+_ALLOWED_NETWORKS = compute_networks_and_masks(settings.RESTRICTED_ACCESS_NETWORKS)
     

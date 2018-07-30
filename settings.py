@@ -18,6 +18,11 @@ DOOR_RESOURCE_ID = 1
 # dictates that the makerspace is closed, should be a list
 MEMBER_TYPES_EXEMPT_FROM_SCHEDULE = ['teacher','administrative']
 
+# IP networks that are allowed access to certain restricted URLs
+# in the MACS system (in particular those that only resource manager
+# hardware should be accessing)
+RESTRICTED_ACCESS_NETWORKS = ['192.168.0.1/16','127.0.0.1']
+
 # update settings from global
 def _settings_from_global():
     try:

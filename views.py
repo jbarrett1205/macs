@@ -2,9 +2,9 @@ from django.http import HttpResponse, Http404
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render, get_object_or_404, redirect
 from django import forms as djforms
-from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
 from django.utils import timezone
 from django.contrib.auth import REDIRECT_FIELD_NAME
@@ -23,8 +23,10 @@ from StringIO import StringIO
 import logging
 
 from .constants import *
-from .models import Member, Keycard, Resource, ResourceAllowed, ResourceAccessLog, DailySchedule, ScheduleException, ActivityLog
+from .models import (Member, Keycard, Resource, ResourceAllowed, ResourceAccessLog,
+    DailySchedule, ScheduleException, ActivityLog, keycard_number_ok)
 from . import settings
+from .ip_utils import macs_restrict_request
 
 
 class MyJSONResponse(HttpResponse):
@@ -49,9 +51,9 @@ def _validate_resource(request, resource_id):
         # have sent as part of the request
         h = 'HTTP_X_RESOURCE_KEY'
         if h not in request.META:
-            raise PermissionDenied()
+            raise PermissionDenied
         elif request.META[h] != resource.secret:
-            raise PermissionDenied()
+            raise PermissionDenied
     else:
         # secret key is not set, no validation to do
         pass
@@ -73,6 +75,7 @@ def _polulate_validation_dict(resource_id, keycard_id, member, ok=False):
         'notok_reason':'',
         'type':'',
         'incognito':1,
+        'resource_locked':0,
     }
     
     if member is not None:
@@ -173,6 +176,7 @@ def logout(request):
 ###########################################################################################################
 ###########################################################################################################
 
+@macs_restrict_request
 def json_download_members(request, resource_id):
     "download a list of all valid users for the given resource"
     
@@ -204,6 +208,7 @@ def json_download_members(request, resource_id):
     # convert to JSON and return
     return MyJSONResponse(r)
 
+@macs_restrict_request
 def json_validate_member(request, resource_id, keycard_id):
     "check if the user specified by the given ID card has permission for the passed resource ID"
     
@@ -220,42 +225,56 @@ def json_validate_member(request, resource_id, keycard_id):
     except Keycard.DoesNotExist:
         keycard = None
         member = None
+    
+    # check to see if the keycard is a special "lockout card"
+    if keycard and keycard.lockout_card and keycard.active and resource.id != settings.DOOR_RESOURCE_ID:
+        # changing the state of a resource based on a GET is not strictly
+        # a desirable thing in terms of web "standards", but it's reasonable
+        # in this case as it's sort of a security lockout
+        resource.locked = True
+        resource.save()        
         
-    # populate the initial return structure, at this point the sturcture is
+    # populate the initial return structure, at this point the structure is
     # as full as it can be and the only things left to determine are the
     # state of the 'ok' flag and the 'notok_reason' which we will
     # figure out in the next block of code
     r = _polulate_validation_dict(resource_id,keycard_id,member)
-        
-    why_denied = 0
-    if keycard is not None:
-        if member is not None:
-            # check that the member account is valid
-            if not member.is_active:
-                why_denied = ACCESS_DENIED_INACTIVE
-            elif (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
-                why_denied = ACCESS_DENIED_EXPIRED
-            elif not keycard.active:
-                why_denied = ACCESS_DENIED_KEYCARD_INACTIVE       
-            else:
-                # first check the access schedule to see that the member
-                # is allowed to access at time time
-                if _schedule_allowed(member):
-                    # next check for member access to the specified resource
-                    result = member.resources.filter(id=resource_id)
-                    if len(result):
-                        r['ok'] = 1
-                    else:
-                        why_denied = ACCESS_DENIED_PERMISSION
-                else:
-                    why_denied = ACCESS_DENIED_SCHEDULE
-        else:
-            # keycard has no member assigned to it
-            why_denied = ACCESS_DENIED_UNASSIGNED_KEYCARD
-    else:
-        # keycard is not in the database
-        why_denied = ACCESS_DENIED_BAD_KEYCARD
     
+    # figure out whether access should be allowed
+    why_denied = 0
+    if resource.locked:
+        why_denied = ACCESS_DENIED_RESOURCE_LOCKED
+        r['resource_locked'] = 1
+    else:
+        if keycard is not None:
+            if member is not None:
+                # check that the member account is valid
+                if not member.is_active:
+                    why_denied = ACCESS_DENIED_INACTIVE
+                elif (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
+                    why_denied = ACCESS_DENIED_EXPIRED
+                elif not keycard.active:
+                    why_denied = ACCESS_DENIED_KEYCARD_INACTIVE       
+                else:
+                    # first check the access schedule to see that the member
+                    # is allowed to access at time time
+                    if _schedule_allowed(member):
+                        # next check for member access to the specified resource
+                        result = member.resources.filter(id=resource_id)
+                        if len(result):
+                            r['ok'] = 1
+                        else:
+                            why_denied = ACCESS_DENIED_PERMISSION
+                    else:
+                        why_denied = ACCESS_DENIED_SCHEDULE
+            else:
+                # keycard has no member assigned to it
+                why_denied = ACCESS_DENIED_UNASSIGNED_KEYCARD
+        else:
+            # keycard is not in the database
+            why_denied = ACCESS_DENIED_BAD_KEYCARD
+    
+    # set the denied reason (empty string if access allowed)
     r['notok_reason'] = access_denied_reason[why_denied]
     
     # create a log entry
@@ -268,6 +287,7 @@ def json_validate_member(request, resource_id, keycard_id):
     # convert to JSON and return
     return MyJSONResponse(r)
         
+@macs_restrict_request
 def json_get_schedule(request, year=None, month=None, day=None):
     "get the makerspace schedule for a given day"
     
@@ -306,6 +326,26 @@ def json_get_schedule(request, year=None, month=None, day=None):
     # convert to JSON and return
     return MyJSONResponse(r)    
     
+@macs_restrict_request
+def json_resource_status(request, resource_id):
+    "check the status of a resource"
+    
+    if request.method != 'GET':
+        return HttpResponse(status=405)  # HTTP METHOD NOT ALLOWED
+    
+    # validate the resource first
+    resource = _validate_resource(request,resource_id)
+    
+    # generate the response
+    r = {
+        'resource_id':int(resource_id),
+        'name':resource.name,
+        'description':resource.description,
+        'resource_locked':1 if resource.locked else 0,
+    }
+    
+    # convert to JSON and return
+    return MyJSONResponse(r)    
     
 ###########################################################################################################
 ###########################################################################################################
@@ -331,9 +371,8 @@ class CreateAssignKeycardForm(djforms.Form):
         ('1','Create New Keycard'),
         ('2','Select From Existing Keycards'),
     ]
-    _check_card_number = re.compile(r'^[0123456789abcdef]{8,}$',re.I)
     number = djforms.CharField(max_length=64,required=False)
-    select_keycard = djforms.ModelChoiceField(queryset=Keycard.objects.filter(member__isnull=True,active=True),required=False)
+    select_keycard = djforms.ModelChoiceField(queryset=Keycard.objects.filter(member__isnull=True,active=True,lockout_card=False),required=False)
     
     def __init__(self, include_no_keycard, *args, **kwargs):
         "allow changing of which action fields are allowed"
@@ -359,8 +398,10 @@ class CreateAssignKeycardForm(djforms.Form):
             pass        
         elif action == 1:
             # check that the number field is valid
-            if not self._check_card_number.match(self.cleaned_data['number']):
-                self.add_error('number',djforms.ValidationError('Keycard ID must be hexadecimal with at least 8 characters.'))
+            try:
+                keycard_number_ok(self.cleaned_data['number'])
+            except ValidationError as ex:
+                self.add_error('number',ex)
         elif action == 2:
             # check that the select_keycard field is valid
             if not isinstance(self.cleaned_data['select_keycard'],Keycard):
@@ -414,9 +455,12 @@ def member_create(request):
                 elif action == 2:
                     # keycard selected, attach the member to it
                     keycard = keycard_data['select_keycard']
-                    keycard.member = member
-                    keycard.save()
-                    _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
+                    if keycard.lockout_card:
+                        messages.add_message(request,messages.WARNING,'`Lockout` keycard cannot be assigned to a member account.')
+                    else:
+                        keycard.member = member
+                        keycard.save()
+                        _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
                 
                 return redirect(member)
     else:
@@ -572,9 +616,12 @@ def member_manage_keycards(request, member_id):
             elif action == 2:
                 # keycard selected, attach the member to it
                 keycard = keycard_data['select_keycard']
-                keycard.member = member
-                keycard.save()
-                _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
+                if keycard.lockout_card:
+                    messages.add_message(request,messages.WARNING,'`Lockout` keycard cannot be assigned to a member account.')
+                else:
+                    keycard.member = member
+                    keycard.save()
+                    _log_activity(request,member,'assign','keycard [%s] assigned to member [%s]'%(keycard.number,member.get_full_name()))
             
             return redirect(request.get_full_path())
     else:
@@ -594,7 +641,8 @@ def member_manage_keycards(request, member_id):
 def keycard_manage_all(request):
     "manage all keycards in the system"
     context = macs_default_context({
-        'unassigned':Keycard.objects.filter(member__isnull=True),
+        'lockout':Keycard.objects.filter(member__isnull=True,lockout_card=True),
+        'unassigned':Keycard.objects.filter(member__isnull=True,lockout_card=False),
         'assigned':Keycard.objects.filter(member__isnull=False).order_by('member__last_name','member__first_name'),
     })
 
@@ -619,7 +667,7 @@ def keycard_set_inactive(request, key_id):
                 _log_activity(request,keycard,'modify','number = [%s], active = [False]'%keycard.number)
                 return redirect(keycard)
             else:
-                raise ValueError('Validation error.')
+                raise ValueError('validation error')
         except Exception as e:
             messages.add_message(request,messages.ERROR,"Unable to inactivate keycard -> "+str(e))
         
@@ -638,7 +686,7 @@ def keycard_set_active(request, key_id):
                 _log_activity(request,keycard,'modify','number = [%s], active = [True]'%keycard.number)
                 return redirect(keycard)
             else:
-                raise ValueError('Validation error.')
+                raise ValueError('validation error')
         except Exception as e:
             messages.add_message(request,messages.ERROR,"Unable to activate keycard -> "+str(e))
         
@@ -658,7 +706,7 @@ def keycard_unassign(request, key_id):
                 _log_activity(request,keycard,'modify','unassigned keycard number [%s] from member [%s]'%(keycard.number,member.get_full_name()))
                 return redirect(keycard)
             else:
-                raise ValueError('Validation error.')
+                raise ValueError('validation error')
         except Exception as e:
             messages.add_message(request,messages.ERROR,"Unable to unassign keycard -> "+str(e))
         
@@ -693,7 +741,7 @@ def keycard_csv_upload(request):
                         continue
                     
                     try:
-                        keycard = Keycard(number=row[0],comment=row[1],active=True)
+                        keycard = Keycard(number=row[0].lower(),comment=row[1],active=True)
                         keycard.save()           
                         _log_activity(request,keycard,'create','number = [%s], id = [%d] (imported from CSV)'%(keycard.number,keycard.id))
                         new_card_count += 1
@@ -713,6 +761,95 @@ def keycard_csv_upload(request):
 
     return render(request,'macs/keycard_csv_upload.htm',macs_default_context({'form':form}))
 
+class KeycardBatchCreateForm(djforms.Form):
+    """form for batch creation of keycards CSV
+    
+    need to use a manual form rather than a ModelForm since
+    the validation of ModelForm does not work correctly when
+    used as part of a formset (Django bug)
+    """
+    
+    number = djforms.CharField(max_length=64)
+    comment = djforms.CharField(max_length=255,required=False)
+    
+    def clean_number(self):
+        value = self.cleaned_data['number']
+        keycard_number_ok(value)
+        return value.lower()
+    
+@permission_required('macs.change_member')
+def keycard_batch_create(request):
+    "create a batch of keycards manually"
+    KeycardBatchCreateFormSet = djforms.formset_factory(KeycardBatchCreateForm,extra=5)
+    
+    if request.method == 'POST':
+        formset = KeycardBatchCreateFormSet(request.POST)
+        if formset.is_valid():
+            new_card_count = 0
+            warnings = []
+            for form in formset:
+                data = form.cleaned_data
+                if 'number' in data:
+                    try:
+                        keycard = Keycard(number=data['number'],comment=data['comment'])
+                        keycard.save()
+                        _log_activity(request,keycard,'create','number = [%s], id = [%d]'%(keycard.number,keycard.id))
+                        new_card_count += 1
+                    except Exception as e:
+                        warnings.append("could not create keycard -> {}".format(e))
+                    
+            if len(warnings):
+                messages.add_message(request,messages.WARNING,'<br />'.join(warnings))
+            if new_card_count:
+                messages.add_message(request,messages.SUCCESS,'Added %d new keycards'%new_card_count)
+                        
+            return redirect('macs.views.keycard_manage_all')
+    else:
+        formset = KeycardBatchCreateFormSet()
+
+    return render(request,'macs/keycard_batch_create.htm',macs_default_context({'formset':formset}))
+
+@permission_required('macs.change_member')
+def keycard_set_lockout_card(request, key_id):
+    "set a keycard to be a special lockout card"
+    keycard = get_object_or_404(Keycard,pk=key_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(key_id):
+                if keycard.member:
+                    raise ValueError("keycard is assigned to a member")
+                keycard.lockout_card = True
+                keycard.save()
+                _log_activity(request,keycard,'modify','number = [%s], lockout_card = [True]'%keycard.number)
+                return redirect(keycard)
+            else:
+                raise ValueError('validation error')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to convert keycard to a 'lockout' card -> {}".format(e))
+        
+    return render(request,'macs/keycard_set_lockout.htm',macs_default_context({'keycard':keycard}))
+
+@permission_required('macs.change_member')
+def keycard_unset_lockout_card(request, key_id):
+    "remove special lockout functionality from a keycard"
+    keycard = get_object_or_404(Keycard,pk=key_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(key_id):
+                keycard.lockout_card = False
+                keycard.save()
+                _log_activity(request,keycard,'modify','number = [%s], lockout_card = [False]'%keycard.number)
+                return redirect(keycard)
+            else:
+                raise ValueError('validation error')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to remove 'lockout' functionality form card -> {}".format(e))
+        
+    return render(request,'macs/keycard_unset_lockout.htm',macs_default_context({'keycard':keycard}))
+
+    
 ###########################################################################################################
 ###########################################################################################################
 #######                     resource creation and modification views                                ####### 
@@ -788,6 +925,45 @@ def resource_edit(request, resource_id):
     context['form'] = form
     return render(request,'macs/resource_edit.htm',context)
 
+@permission_required('macs.change_resource')
+def resource_unlock(request, rsc_id):
+    "unlock a resource"
+    resource = get_object_or_404(Resource,pk=rsc_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(rsc_id):
+                resource.locked = False
+                resource.save()
+                _log_activity(request,resource,'modify','name = [%s], locked = [False]'%resource.name)
+                return redirect(resource)
+            else:
+                raise ValueError('validation error')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to unlock resource -> {}".format(e))
+        
+    return render(request,'macs/resource_unlock.htm',macs_default_context({'resource':resource}))
+
+@permission_required('macs.change_resource')
+def resource_lock(request, rsc_id):
+    "unlock a resource"
+    resource = get_object_or_404(Resource,pk=rsc_id)
+    if request.method == 'POST':
+        try:
+            req_id = int(request.POST['id'])
+            if req_id == int(rsc_id):
+                resource.locked = True
+                resource.save()
+                _log_activity(request,resource,'modify','name = [%s], locked = [True]'%resource.name)
+                return redirect(resource)
+            else:
+                raise ValueError('validation error')
+        except Exception as e:
+            messages.add_message(request,messages.ERROR,"Unable to lock resource -> {}".format(e))
+        
+    return render(request,'macs/resource_lock.htm',macs_default_context({'resource':resource}))
+    
+    
 ###########################################################################################################
 ###########################################################################################################
 #######                     views for allowing users to view reports                                ####### 

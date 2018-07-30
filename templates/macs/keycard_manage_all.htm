@@ -5,8 +5,22 @@
 <h1>Keycards</h1>
 
 <ul>
-  <li><a href="{% url 'macs.views.keycard_csv_upload' %}">Upload keycards from CSV</a></li>
+  <li><a href="{% url 'macs.views.keycard_batch_create' %}">Manually Enter New Keycards</a></li>
+  <li><a href="{% url 'macs.views.keycard_csv_upload' %}">Upload Keycards from CSV</a></li>
 </ul>
+
+<h2>&quot;Lockout&quot; Keycards</h2>
+
+<table class="padded">
+<tr><th>ID</th><th>Status</th><th>Comment</th><th>&nbsp;</th></tr>
+{% for keycard in lockout %}
+	<tr class="{% cycle 'odd' 'even' %}">
+	   <td>{{ keycard.number }}</td><td>{% if keycard.active %}<span style="color:#00ff00;">active</span>{% else %}<span style="color:#ff0000;font-style:italic;">inactive</span>{% endif %}</td>
+	   <td>{{ keycard.comment|default:"&nbsp;" }}</td>
+	   <td><a href="{% url 'macs.views.keycard_manage' keycard.id %}">manage</a></td>
+	   </tr>
+{% endfor %} 
+</table>
 
 <h2>Unassigned Keycards</h2>
 

@@ -8,9 +8,10 @@
 
 {% if resources %}
 	<table class="padded">
-	<tr><th>ID</th><th>Name</th><th>Description</th><th>&nbsp;</th></tr>
+	<tr><th>ID</th><th>Name</th><th>Description</th><th>Status</th><th>&nbsp;</th></tr>
 	{% for r in resources %}
 		<tr class="{% cycle 'odd' 'even' %}"><td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.description }}</td>
+		   <td>{% if r.locked %}<span class="warning">locked</span>{% else %}ok{% endif %}</td>
 		   <td><a href="{% url 'macs.views.resource_view' r.id %}">manage</a></td>
 		   </tr>
 	{% endfor %} 

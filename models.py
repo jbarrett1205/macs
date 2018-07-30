@@ -5,6 +5,7 @@ try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
+from django.utils.encoding import python_2_unicode_compatible
 import re, datetime
 
 from .constants import access_denied_reason
@@ -16,6 +17,7 @@ MEMBERSHIP_TYPES = [
     ('teacher','Teacher'),
 ]
 
+@python_2_unicode_compatible
 class Member(User):
     """Core membership info for a Makerspace user
     
@@ -32,8 +34,8 @@ class Member(User):
     # mark certain members as incognito, so the doorbot doesn't tweet them
     incognito = models.BooleanField(blank=True,default=False)
         
-    def __unicode__(self):
-        return u'%s %s'%(self.first_name,self.last_name)
+    def __str__(self):
+        return '%s %s'%(self.first_name,self.last_name)
             
     def get_absolute_url(self):
         return reverse('macs.views.member_view',args=[str(self.id)])
@@ -55,18 +57,19 @@ class Member(User):
         
 def keycard_number_ok( value ):
     "keycard number validator"
-    if not re.match(r'^[0123456789abcdef]{8,}$',value, re.I):
+    if  len(value) < 8 or not re.match(r'^[0123456789abcdef]{8,}$',value, re.I):
         raise ValidationError('keycard ID must be a hexadecimal string, 8 characters or more')
     
-        
+@python_2_unicode_compatible
 class Keycard(models.Model):
     "keycard assigned to a member and used for resource access"
-    number = models.CharField(max_length=64,unique=True,help_text="Keycard ID String (hexadecimal)",validators=[keycard_number_ok])
+    number = models.CharField(max_length=64,blank=False,unique=True,help_text="Keycard ID String (hexadecimal)",validators=[keycard_number_ok])
     member = models.ForeignKey(Member,null=True,blank=True,on_delete=models.SET_NULL,help_text="Member assigned to this card")
     active = models.BooleanField(default=True,blank=True,help_text="keycard is active")
     comment = models.CharField(max_length=128,blank=True,help_text="optional comment")
+    lockout_card = models.BooleanField(default=False,blank=True,help_text="keycard is a lockout card")
     
-    def __unicode__(self):
+    def __str__(self):
         return self.number + ' (' + self.comment.strip() + ')'
     
     def get_absolute_url(self):
@@ -76,6 +79,7 @@ class Keycard(models.Model):
         ordering = ('active','number')
         
         
+@python_2_unicode_compatible
 class Resource(models.Model):
     """Resources defined by the makerspace
     
@@ -87,9 +91,10 @@ class Resource(models.Model):
     secret = models.CharField(max_length=32,blank=True,help_text="resource secret key")
     cost_per_hour = models.FloatField(blank=True,default=0.0,help_text="cost per hour of use")
     admin_url = models.URLField(blank=True,help_text="URL for performing admin activity on the resource")
+    locked = models.BooleanField(default=False,blank=True,help_text="resource is locked out")
         
-    def __unicode__(self):
-        return u'%d: %s'%(self.id,self.name)
+    def __str__(self):
+        return '%d: %s'%(self.id,self.name)
     
     def get_absolute_url(self):
         return reverse('macs.views.resource_view',args=[str(self.id)])  

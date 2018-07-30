@@ -18,6 +18,12 @@ can solicit payments/donations. This field is in dollars.</p>
 address that can be used to perform admin actions on the resource. If it is used, it must be a valid URL
 (something like &quot;http://192.168.1.100/admin&quot;).</p>
 
+{% if resource.locked %}
+<p class="critical">This resource is currently locked! To unlock it, please ensure it is in safe working order
+first then use the <a href="{% url 'macs.views.resource_unlock' resource.id %}">Unlock Resource</a> link
+to unlock it.</p>
+{% endif %}
+
 <form method="post">
 {% csrf_token %}
 

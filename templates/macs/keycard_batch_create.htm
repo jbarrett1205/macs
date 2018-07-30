@@ -1,0 +1,25 @@
+{% extends "macs/base.htm" %}
+
+{% block macs_content %}
+
+<h1>Create Keycards</h1>
+
+<p class="blocknote rounded">Manually enter one or more keycards into the form below. Rows where the
+Keycard Number is left blank are ignored.</p>
+
+<form method="post">
+{% csrf_token %}
+{{ formset.management_form }}
+
+<table class="padded">
+  <tr><th>Keycard Number</th><th>Comment (optional)</th></tr>
+{% for form in formset %}
+  <tr class="{% cycle 'odd' 'even' %}"><td>{{ form.number }}</td><td>{{ form.comment }}</td></tr>
+{% endfor %}
+</table>
+
+<p><input type="submit" value="Create" /></p>
+
+</form>
+
+{% endblock macs_content %}

@@ -1,0 +1,21 @@
+{% extends "macs/base.htm" %}
+
+{% block macs_content %}
+
+<h1>Lock Resource</h1>
+
+<p class="warning">Are you sure that you want to lock this resource?</p>
+
+<table class="padded">
+<tr><th>Name</th><td>{{ resource.name }}</td></tr>
+<tr><th>Description</th><td>{{ resource.description }}</td></tr>
+</table>
+
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="id" value="{{ resource.id }}" />
+<p><input type="submit" value="Lock" />
+   <span style="padding-left:15px;"><a href="{% url 'macs.views.resource_view' resource.id %}">Cancel</a></span></p>
+</form>
+
+{% endblock macs_content %}
