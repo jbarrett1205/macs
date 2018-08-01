@@ -28,6 +28,7 @@ from .models import (Member, Keycard, Resource, ResourceAllowed, ResourceAccessL
 from . import settings
 from .ip_utils import macs_restrict_request
 
+RESOURCE_UNLOCK_SECRET = '123unlockme'
 
 class MyJSONResponse(HttpResponse):
     "JSON response object"
@@ -233,6 +234,7 @@ def json_validate_member(request, resource_id, keycard_id):
         # in this case as it's sort of a security lockout
         resource.locked = True
         resource.save()        
+        _log_activity(request,resource,'modify','name = [%s], locked = [True] (remote lock, keycard: %s)'%(resource.name,keycard.number))
         
     # populate the initial return structure, at this point the structure is
     # as full as it can be and the only things left to determine are the
@@ -330,11 +332,18 @@ def json_get_schedule(request, year=None, month=None, day=None):
 def json_resource_status(request, resource_id):
     "check the status of a resource"
     
-    if request.method != 'GET':
-        return HttpResponse(status=405)  # HTTP METHOD NOT ALLOWED
-    
     # validate the resource first
     resource = _validate_resource(request,resource_id)
+    
+    if request.method == 'POST':
+        # check to see if this is an unlock request
+        data = request.POST
+        action = data.get('action','')
+        secret = data.get('secret','')
+        if action.lower() == 'unlock' and secret == RESOURCE_UNLOCK_SECRET and resource.locked:
+            resource.locked = False
+            resource.save()
+            _log_activity(request,resource,'modify','name = [%s], locked = [False] (remote unlock)'%resource.name)
     
     # generate the response
     r = {
