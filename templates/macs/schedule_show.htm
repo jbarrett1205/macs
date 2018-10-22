@@ -13,12 +13,12 @@ windows below are the default daily times when the Makerspace is open.</p>
 <tr><th>Day</th><th>Opens At</th><th>Closes At</th><th>&nbsp;</th><th>&nbsp;</th></tr>
 {% for d in daily_schedule %}
 	<tr class="{% cycle 'odd' 'even' %}"><td>{{ d.get_day_display }}</td><td>{{ d.start_time }}</td><td>{{ d.end_time }}</td>
-	   <td><a href="{% url 'macs.views.schedule_edit_daily' d.id %}">edit</a></td>
-	   <td><a href="{% url 'macs.views.schedule_remove_daily' d.id %}">delete</a></td>
+	   <td><a href="{% url 'macs:schedule_daily_edit' d.id %}">edit</a></td>
+	   <td><a href="{% url 'macs:schedule_daily_delete' d.id %}">delete</a></td>
 	   </tr>
 {% endfor %} 
 </table>
-<p><a href="{% url 'macs.views.schedule_add_daily' %}">Add a new daily schedule window</a></p>
+<p><a href="{% url 'macs:schedule_daily_add' %}">Add a new daily schedule window</a></p>
 
 
 <h2>Schedule Exeptions</h2>
@@ -34,12 +34,12 @@ space for a specific date and time window.</p>
 	<tr class="{% cycle 'odd' 'even' %}"><td>{{ d.date }}</td><td>{{ d.start_time }}</td><td>{{ d.end_time }}</td>
 	   <td>{% if d.open %}<span style="color:green;">Open</span>{% else %}<span style="color:red;">Closed</span>{% endif %}</td>
 	   <td>{{ d.comment|default:"&nbsp;" }}</td>
-	   <td><a href="{% url 'macs.views.schedule_edit_exception' d.id %}">edit</a></td>
-	   <td><a href="{% url 'macs.views.schedule_remove_exception' d.id %}">delete</a></td>
+	   <td><a href="{% url 'macs:schedule_exception_edit' d.id %}">edit</a></td>
+	   <td><a href="{% url 'macs:schedule_exception_delete' d.id %}">delete</a></td>
 	   </tr>
 {% endfor %} 
 </table>
-<p><a href="{% url 'macs.views.schedule_add_exception' %}">Add a new exception</a></p>
+<p><a href="{% url 'macs:schedule_exception_add' %}">Add a new exception</a></p>
 
 
 {% endblock macs_content %}

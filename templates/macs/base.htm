@@ -12,28 +12,28 @@
   <button id="macs-nav-toggle">&#9776; MACS</button>
   <nav id="macs-nav">
     <ul>
-	  <li><a href="{% url 'macs_home' %}">MACS Home</a></li>
+	  <li><a href="{% url 'macs:macs_home' %}">MACS Home</a></li>
       <li>
-	    <a href="{% url 'macs.views.member_list' %}">Members</a>
+	    <a href="{% url 'macs:members' %}">Members</a>
         <ul>
-          <li><a href="{% url 'macs.views.member_create' %}">New Member</a></li>
-          <li><a href="{% url 'macs.views.keycard_manage_all' %}">Manage Keycards</a></li>
+          <li><a href="{% url 'macs:member_create' %}">New Member</a></li>
+          <li><a href="{% url 'macs:keycards' %}">Manage Keycards</a></li>
         </ul>
 	  </li>
 	  <li>
-        <a href="{% url 'macs.views.resource_list' %}">Resources</a>
+        <a href="{% url 'macs:resources' %}">Resources</a>
         <ul>
-          <li><a href="{% url 'macs.views.resource_create' %}">New Resource</a></li>
+          <li><a href="{% url 'macs:resource_create' %}">New Resource</a></li>
         </ul>
       </li>
 	  <li>
         <span>Reports</span>
         <ul>
-          <li><a href="{% url 'macs.views.report_access_log' %}">Resource Access Log</a></li>
-          <li><a href="{% url 'macs.views.report_activity_log' %}">Admin Activity Log</a></li>
+          <li><a href="{% url 'macs:report_access' %}">Resource Access Log</a></li>
+          <li><a href="{% url 'macs:report_activity' %}">Admin Activity Log</a></li>
         </ul>
 	  </li>
-	  <li><a href="{% url 'macs.views.schedule_show' %}">Schedule</a></li>
+	  <li><a href="{% url 'macs:schedule' %}">Schedule</a></li>
     </ul>
   </nav>	
   </div>

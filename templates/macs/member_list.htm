@@ -19,9 +19,10 @@
 		<tr class="{% cycle 'odd' 'even' %}">
 		   <td>{{ m.last_name }}</td><td>{{ m.first_name }}</td><td>{{ m.get_membership_type_display }}</td>
 		   <td>{{ m.get_keycard_list|join:" / "|default:"&nbsp;" }}</td>
-		   <td><span class="{% if m.is_expired %}warning{% endif %}">{{ m.expires }}</span></td>
-		   <td class="acenter"><a href="{% url 'macs.views.member_view' m.id %}"><img class="macs-icon" src="{{ STATIC_URL }}macs/view-32x32.png" alt="view" /></a></td>
-		   <td class="acenter"><a href="{% url 'macs.views.member_edit' m.id %}"><img class="macs-icon" src="{{ STATIC_URL }}macs/edit-32x32.png" alt="edit" /></a></td>
+		   <td><span{% if m.is_expired %} class="warning"{% endif %}>
+		   {% if m.does_not_expire %}<span style="color:#ff8000;">never</span>{% else %}{{ m.expires }}{% endif %}</span></td>
+		   <td class="acenter"><a href="{% url 'macs:member_view' m.id %}"><img class="macs-icon" src="{{ STATIC_URL }}macs/view-32x32.png" alt="view" /></a></td>
+		   <td class="acenter"><a href="{% url 'macs:member_edit' m.id %}"><img class="macs-icon" src="{{ STATIC_URL }}macs/edit-32x32.png" alt="edit" /></a></td>
 		   </tr>
 	{% endfor %} 
 	</table>

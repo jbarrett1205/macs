@@ -13,7 +13,7 @@
 <tr class="odd"><th>Last Name</th><td>{{ member.last_name }}</td></tr>
 <tr class="even"><th>User ID</th><td>{{ member.username }}</td></tr>
 <tr class="odd"><th>Email</th><td>{{ member.email }}</td></tr>
-<tr class="even"><th>Expires</th><td>{{ member.expires }}</td></tr>
+<tr class="even"><th>Expires</th><td>{% if member.does_not_expire %}<span class="warning">never</span>{% else %}{{ member.expires }}{% endif %}</td></tr>
 <tr class="odd"><th>Incognito</th><td>{{ member.incognito }}</td></tr>
 </table>
 
@@ -21,7 +21,7 @@
 <textarea rows="8" cols="70" readonly="readonly" disabled="disabled">{{ member.comments }}</textarea>
 </p>
 
-<p><a href="{% url 'macs.views.member_edit' member.id %}">Edit member info</a></p>
+<p><a href="{% url 'macs:member_edit' member.id %}">Edit member info</a></p>
 
 <h2>Keycards</h2>
 <table class="padded">
@@ -29,12 +29,12 @@
 {% for card in member.keycard_set.all %}
    <tr class="{% cycle 'odd' 'even' %}"><td>{{ card.number }}</td>
       <td>{% if card.active %}<span style="color:#00ff00;">active</span>{% else %}<span style="color:#ff0000;font-style:italic;">inactive</span>{% endif %}</td>
-      <td><a href="{% url 'macs.views.keycard_manage' card.id %}">manage</a></td>
+      <td><a href="{% url 'macs:keycard_manage' card.id %}">manage</a></td>
    </tr>
 {% endfor %}
 </table>
 
-<p><a href="{% url 'macs.views.member_manage_keycards' member.id %}">Assign a Keycard</a></p>
+<p><a href="{% url 'macs:member_keycards' member.id %}">Assign a Keycard</a></p>
   
 <h2>Resources</h2>
 
@@ -42,10 +42,10 @@
    <tr><th>ID</th><th>Name</th><th>Description</th><th>&nbsp;</th></tr>
 {% for r in member.resources.all %}
    <tr class="{% cycle 'odd' 'even' %}"><td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.description }}</td>
-      <td><a href="{% url 'macs.views.remove_resource_access' member.id r.id %}">remove</a></td></tr>
+      <td><a href="{% url 'macs:member_remove_resource' member.id r.id %}">remove</a></td></tr>
 {% endfor %}
 </table>
 
-<p><a href="{% url 'macs.views.add_resource_access' member.id %}">Add resources</a></p>  
+<p><a href="{% url 'macs:member_add_resource' member.id %}">Add resources</a></p>  
 
 {% endblock macs_content %}

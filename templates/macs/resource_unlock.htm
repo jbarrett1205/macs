@@ -15,7 +15,7 @@
 {% csrf_token %}
 <input type="hidden" name="id" value="{{ resource.id }}" />
 <p><input type="submit" value="Unlock" />
-   <span style="padding-left:15px;"><a href="{% url 'macs.views.resource_view' resource.id %}">Cancel</a></span></p>
+   <span style="padding-left:15px;"><a href="{% url 'macs:resource_view' resource.id %}">Cancel</a></span></p>
 </form>
 
 {% endblock macs_content %}

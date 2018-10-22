@@ -16,23 +16,23 @@
 
 <ul>
 {% if keycard.active %}
-   <li><a href="{% url 'macs.views.keycard_set_inactive' keycard.id %}">Deactivate</a></li>
+   <li><a href="{% url 'macs:keycard_deactivate' keycard.id %}">Deactivate</a></li>
 {% else %}
-   <li><a href="{% url 'macs.views.keycard_set_active' keycard.id %}">Activate</a></li>
+   <li><a href="{% url 'macs:keycard_activate' keycard.id %}">Activate</a></li>
 {% endif %}  
 
 {% if keycard.member %}
-   <li><a href="{% url 'macs.views.keycard_unassign' keycard.id %}">Unassign</a></li>
-   <li><a href="{% url 'macs.views.member_view' keycard.member.id %}">Go to Member View</a></li>
+   <li><a href="{% url 'macs:keycard_unassign' keycard.id %}">Unassign</a></li>
+   <li><a href="{% url 'macs:member_view' keycard.member.id %}">Go to Member View</a></li>
 {% else %}
   {% if keycard.lockout_card %}
-   <li><a href="{% url 'macs.views.keycard_unset_lockout_card' keycard.id %}">Remove Lockout Function</a></li>
+   <li><a href="{% url 'macs:keycard_unset_lockout' keycard.id %}">Remove Lockout Function</a></li>
   {% else %}
-   <li><a href="{% url 'macs.views.keycard_set_lockout_card' keycard.id %}">Convert to &quot;Lockout&quot; Card</a></li>
+   <li><a href="{% url 'macs:keycard_set_lockout' keycard.id %}">Convert to &quot;Lockout&quot; Card</a></li>
   {% endif %}  
 {% endif %}
 
-   <li><a href="{% url 'macs.views.keycard_manage_all' %}">Go to Keycard Management</a></li>
+   <li><a href="{% url 'macs:keycards' %}">Go to Keycard Management</a></li>
 <ul>
 
 {% endblock macs_content %}

@@ -16,7 +16,7 @@
 {% csrf_token %}
 <input type="hidden" name="id" value="{{ keycard.id }}" />
 <p><input type="submit" value="Unassign" />
-   <span style="padding-left:15px;"><a href="{% url 'macs.views.keycard_manage' keycard.id %}">Cancel</a></span></p>
+   <span style="padding-left:15px;"><a href="{% url 'macs:keycard_manage' keycard.id %}">Cancel</a></span></p>
 </form>
 
 {% endblock macs_content %}

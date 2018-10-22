@@ -26,7 +26,7 @@ class Member(User):
     """
     
     membership_type = models.CharField(max_length=64,choices=MEMBERSHIP_TYPES,help_text="Type of membership")
-    expires = models.DateField()
+    expires = models.DateField(blank=True,null=True)
     resources = models.ManyToManyField('Resource',through='ResourceAllowed',through_fields=('member','resource'))
     comments = models.TextField(blank=True)
     # try to match the amherst rec account records to the makerspace account
@@ -38,7 +38,7 @@ class Member(User):
         return '%s %s'%(self.first_name,self.last_name)
             
     def get_absolute_url(self):
-        return reverse('macs.views.member_view',args=[str(self.id)])
+        return reverse('macs:member_view',args=[str(self.id)])
         
     def get_keycard_list(self):
         "get a list of keycards by number"
@@ -50,7 +50,14 @@ class Member(User):
     @property
     def is_expired(self):
         "check if account is expired"
+        if self.does_not_expire:
+            return False
         return bool(self.expires < datetime.date.today())
+    
+    @property
+    def does_not_expire(self):
+        "check if the memeber account does not expire"
+        return bool(self.expires is None)
 
     class Meta:
         ordering = ('last_name','first_name')
@@ -73,7 +80,7 @@ class Keycard(models.Model):
         return self.number + ' (' + self.comment.strip() + ')'
     
     def get_absolute_url(self):
-        return reverse('macs.views.keycard_manage',args=[str(self.id)])  
+        return reverse('macs:keycard_manage',args=[str(self.id)])  
         
     class Meta:
         ordering = ('active','number')
@@ -97,7 +104,7 @@ class Resource(models.Model):
         return '%d: %s'%(self.id,self.name)
     
     def get_absolute_url(self):
-        return reverse('macs.views.resource_view',args=[str(self.id)])  
+        return reverse('macs:resource_view',args=[str(self.id)])  
     
     class Meta:
         ordering = ('name',)

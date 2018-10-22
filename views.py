@@ -1,4 +1,4 @@
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, JsonResponse
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render, get_object_or_404, redirect
 from django import forms as djforms
@@ -9,10 +9,7 @@ from django.contrib.auth.decorators import login_required, permission_required, 
 from django.utils import timezone
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth import views as auth_views
-try:
-    from django.urls import reverse
-except ImportError:
-    from django.core.urlresolvers import reverse
+from django.db.models import Q
 
 import random
 import json
@@ -29,18 +26,6 @@ from . import settings
 from .ip_utils import macs_restrict_request
 
 RESOURCE_UNLOCK_SECRET = '123unlockme'
-
-class MyJSONResponse(HttpResponse):
-    "JSON response object"
-    
-    def __init__(self, data, **kwargs):
-        "initializer"
-        # initialize the parent class
-        if 'content_type' in kwargs:
-            # don't allow content_type to be overridden
-            del kwargs['content_type']
-        super(MyJSONResponse,self).__init__(json.dumps(data), content_type='application/json; charset=utf-8', **kwargs)
-
 
 def _validate_resource(request, resource_id):
     "validate the resource, throws a PermissionDenied exception if it fails or Http404 exception if the resource ID is invalid"
@@ -83,7 +68,10 @@ def _polulate_validation_dict(resource_id, keycard_id, member, ok=False):
         r['first_name'] = member.first_name
         r['last_name'] = member.last_name
         r['user_id'] = member.username
-        r['expires'] = member.expires.strftime('%Y/%m/%d')
+        if member.does_not_expire:
+            r['expires'] = '2099/01/01'
+        else:
+            r['expires'] = member.expires.strftime('%Y/%m/%d')
         r['type'] = member.membership_type
         r['incognito'] = 1 if member.incognito else 0
     
@@ -197,7 +185,7 @@ def json_download_members(request, resource_id):
         if not member.is_active:
             # account inactive
             pass
-        elif (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
+        elif member.expires and (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
             # account expired
             pass
         else:
@@ -207,7 +195,7 @@ def json_download_members(request, resource_id):
                 r.append(_polulate_validation_dict(resource_id,keycard.number,member,True))
 
     # convert to JSON and return
-    return MyJSONResponse(r)
+    return JsonResponse(r,safe=False)
 
 @macs_restrict_request
 def json_validate_member(request, resource_id, keycard_id):
@@ -253,7 +241,7 @@ def json_validate_member(request, resource_id, keycard_id):
                 # check that the member account is valid
                 if not member.is_active:
                     why_denied = ACCESS_DENIED_INACTIVE
-                elif (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
+                elif member.expires and (member.expires - datetime.date.today()).days < -settings.GRACE_PERIOD_DAYS:
                     why_denied = ACCESS_DENIED_EXPIRED
                 elif not keycard.active:
                     why_denied = ACCESS_DENIED_KEYCARD_INACTIVE       
@@ -287,7 +275,7 @@ def json_validate_member(request, resource_id, keycard_id):
         pass
         
     # convert to JSON and return
-    return MyJSONResponse(r)
+    return JsonResponse(r)
         
 @macs_restrict_request
 def json_get_schedule(request, year=None, month=None, day=None):
@@ -326,7 +314,7 @@ def json_get_schedule(request, year=None, month=None, day=None):
     }
     
     # convert to JSON and return
-    return MyJSONResponse(r)    
+    return JsonResponse(r)    
     
 @macs_restrict_request
 def json_resource_status(request, resource_id):
@@ -337,9 +325,8 @@ def json_resource_status(request, resource_id):
     
     if request.method == 'POST':
         # check to see if this is an unlock request
-        data = request.POST
-        action = data.get('action','')
-        secret = data.get('secret','')
+        action = request.POST.get('action','')
+        secret = request.POST.get('secret','')
         if action.lower() == 'unlock' and secret == RESOURCE_UNLOCK_SECRET and resource.locked:
             resource.locked = False
             resource.save()
@@ -354,7 +341,7 @@ def json_resource_status(request, resource_id):
     }
     
     # convert to JSON and return
-    return MyJSONResponse(r)    
+    return JsonResponse(r)    
     
 ###########################################################################################################
 ###########################################################################################################
@@ -446,7 +433,8 @@ def member_create(request):
                     pw += random.choice('abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ123456789')
                 member.set_password(pw)
                 member.save()
-                _log_activity(request,member,'create','name = [%s], id = [%d], expires = [%s]'%(member.get_full_name(),member.id,member.expires.strftime('%Y/%m/%d')))
+                expires = member.expires.strftime('%Y/%m/%d') if member.expires else 'never'
+                _log_activity(request,member,'create','name = [%s], id = [%d], expires = [%s]'%(member.get_full_name(),member.id,expires))
                 
                 # create default access to the "door" resource
                 ra = ResourceAllowed(member=member,resource=door,trainer='n/a')
@@ -488,7 +476,7 @@ def member_list(request):
     if which == 'expired':
         qs = Member.objects.filter(expires__lt=datetime.date.today())
     elif which == 'active':
-        qs = Member.objects.filter(expires__gte=datetime.date.today())
+        qs = Member.objects.filter(Q(expires__gte=datetime.date.today()) | Q(expires__isnull=True))
     else:
         qs = Member.objects.all()
         which = 'all'
@@ -514,14 +502,15 @@ def member_edit(request, member_id):
         if form.is_valid():
             if form.has_changed():
                 member = form.save()
-                if not member.is_active and member.expires > datetime.date.today():
+                if not member.is_active and (not member.expires or member.expires > datetime.date.today()):
                     # re-activate accounts that have been disabled if the
                     # memebership expiration date is in the future
                     member.is_active = True
                     member.save()
                 extra = ''
                 if 'expires' in form.changed_data:
-                    extra = ' -> new expires = [%s]'%member.expires.strftime('%Y/%m/%d')
+                    expires = member.expires.strftime('%Y/%m/%d') if member.expires else 'never'
+                    extra = ' -> new expires = [%s]'%expires
                 _log_activity(request,member,'modify','changed fields: %s'%(', '.join(form.changed_data))+extra)
             return redirect(member)
         else:
@@ -761,7 +750,7 @@ def keycard_csv_upload(request):
                     messages.add_message(request,messages.WARNING,'<br />'.join(warnings))
                 messages.add_message(request,messages.SUCCESS,'Added %d new keycards'%new_card_count)
                 
-                return redirect('macs.views.keycard_manage_all')
+                return redirect('macs:keycards')
                 
             except Exception as e:
                 messages.add_message(request,messages.ERROR,'Unable to parse CSV file -> '+str(e))
@@ -812,7 +801,7 @@ def keycard_batch_create(request):
             if new_card_count:
                 messages.add_message(request,messages.SUCCESS,'Added %d new keycards'%new_card_count)
                         
-            return redirect('macs.views.keycard_manage_all')
+            return redirect('macs:keycards')
     else:
         formset = KeycardBatchCreateFormSet()
 
@@ -1094,7 +1083,7 @@ def schedule_add_daily(request):
             # create the schedule
             schedule = form.save()
             _log_activity(request,schedule,'create','day = [%d], start = [%s], end = [%s]'%(schedule.day,schedule.start_time.strftime('%H:%M:%S'),schedule.end_time.strftime('%H:%M:%S')))
-            return redirect('macs.views.schedule_show')
+            return redirect('macs:schedule')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
     
@@ -1117,7 +1106,7 @@ def schedule_edit_daily(request, sch_id):
             if form.has_changed():
                 schedule = form.save()
                 _log_activity(request,schedule,'modify','changed fields: %s'%(', '.join(form.changed_data)))
-            return redirect('macs.views.schedule_show')
+            return redirect('macs:schedule')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
     
@@ -1139,7 +1128,7 @@ def schedule_remove_daily(request, sch_id):
             if del_id == int(sch_id):
                 _log_activity(request,schedule,'delete')
                 schedule.delete()
-                return redirect('macs.views.schedule_show')
+                return redirect('macs:schedule')
             else:
                 raise ValueError('Validation failed.')
         
@@ -1159,7 +1148,7 @@ def schedule_add_exception(request):
             # create the schedule
             schedule = form.save()
             _log_activity(request,schedule,'create','date = [%s], start = [%s], end = [%s], open=[%s]'%(schedule.date.strftime('%Y/%m/%d'),schedule.start_time.strftime('%H:%M:%S'),schedule.end_time.strftime('%H:%M:%S'),schedule.open))
-            return redirect('macs.views.schedule_show')
+            return redirect('macs:schedule')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
     
@@ -1182,7 +1171,7 @@ def schedule_edit_exception(request, sch_id):
             if form.has_changed():
                 schedule = form.save()
                 _log_activity(request,schedule,'modify','changed fields: %s'%(', '.join(form.changed_data)))
-            return redirect('macs.views.schedule_show')
+            return redirect('macs:schedule')
         else:
             messages.add_message(request,messages.ERROR,'Validation failed. Please check form fields for errors.')        
     
@@ -1204,7 +1193,7 @@ def schedule_remove_exception(request, sch_id):
             if del_id == int(sch_id):
                 _log_activity(request,schedule,'delete')
                 schedule.delete()
-                return redirect('macs.views.schedule_show')
+                return redirect('macs:schedule')
             else:
                 raise ValueError('Validation error.')
         except Exception as e:

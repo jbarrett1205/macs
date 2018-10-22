@@ -15,7 +15,7 @@
 {% csrf_token %}
 <input type="hidden" name="id" value="{{ resource_allowed.id }}" />
 <p><input type="submit" value="Remove Access" />
-   <span style="padding-left:15px;"><a href="{% url 'macs.views.member_view' resource_allowed.member.id %}">Cancel</a></span></p>
+   <span style="padding-left:15px;"><a href="{% url 'macs:member_view' resource_allowed.member.id %}">Cancel</a></span></p>
 </form>
 
 {% endblock macs_content %}

@@ -1,4 +1,5 @@
 {% extends "macs/base.htm" %}
+{% load sekizai_tags %}
 
 {% block macs_content %}
 <h1>Edit Account</h1>
@@ -9,24 +10,55 @@
 <p class="form_errors">{{ form.non_field_errors }}</p>
 
 <table class="padded">
-<tr><th>{{ form.first_name.label }}</th><td>{{ form.first_name }}</td><td>{{ form.first_name.errors }}</td></tr>
-<tr><th>{{ form.last_name.label }}</th><td>{{ form.last_name }}</td><td>{{ form.last_name.errors }}</td></tr>
-<tr><th>{{ form.email.label }}</th><td>{{ form.email }}</td><td>{{ form.email.errors }}</td></tr>
-<tr><th>{{ form.username.label }}</th><td>{{ form.username }}</td><td>{{ form.username.errors }}</td></tr>
+<tr><th>{{ form.first_name.label }}</th><td>{{ form.first_name }} {{ form.first_name.errors }}</td></tr>
+<tr><th>{{ form.last_name.label }}</th><td>{{ form.last_name }} {{ form.last_name.errors }}</td></tr>
+<tr><th>{{ form.email.label }}</th><td>{{ form.email }} {{ form.email.errors }}</td></tr>
+<tr><th>{{ form.username.label }}</th><td>{{ form.username }} {{ form.username.errors }}</td></tr>
 <tr><th>{{ form.membership_type.label }}</th><td>{{ form.membership_type }}</td><td>{{ form.membership_type.errors }}</td></tr>
-<tr><th>{{ form.expires.label }}</th><td>{{ form.expires }}</td><td>{{ form.expires.errors }}</td></tr>
-<tr><th>{{ form.incognito.label }}</th><td>{{ form.incognito }}</td><td>{{ form.incognito.errors }}</td></tr>
-<tr><th>{{ form.billing_id.label }}</th><td>{{ form.billing_id }} (leave blank for now)</td><td>{{ form.billing_id.errors }}</td></tr>
-<tr><th style="vertical-align:top;">{{ form.comments.label }}</th><td>{{ form.comments }}</td><td>{{ form.comments.errors }}</td></tr>
+<tr><th>{{ form.expires.label }}</th><td>{{ form.expires }} <button id="plus3months">+3 Mos</button><button id="plus1year">+1 Yr</button>{{ form.expires.errors }}</td></tr>
+<tr><th>{{ form.incognito.label }}</th><td>{{ form.incognito }} {{ form.incognito.errors }}</td></tr>
+<tr><th>{{ form.billing_id.label }}</th><td>{{ form.billing_id }} (leave blank for now) {{ form.billing_id.errors }}</td></tr>
+<tr><th style="vertical-align:top;">{{ form.comments.label }}</th><td>{{ form.comments }} {{ form.comments.errors }}</td></tr>
 </table>
 
 <p><input type="submit" value="Save Changes" />
-   <span style="padding-left:15px;"><a href="{% url 'macs.views.member_view' member.id %}">Cancel</a></span></p>
+   <span style="padding-left:15px;"><a href="{% url 'macs:member_view' member.id %}">Cancel</a></span></p>
 
 </form>
 
+{% addtoblock "js" %}
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.js"></script>
 <script type="text/javascript">
-$('#id_expires').datepicker({dateFormat:'yy-mm-dd'})
-
+$(document).ready( function() {
+	var el_expires = $('#id_expires');
+	el_expires.datepicker({dateFormat:'yy-mm-dd'});
+	
+	function get_current_expires() {
+		var curr;
+		if( el_expires.val().trim() ) {
+			curr = moment(el_expires.val());
+			if( !curr.isValid() )
+				curr = moment();
+		}
+		else
+			curr = moment();
+		return curr;
+	}
+	
+	$('#plus3months').on('click', function(evt) {
+		evt.preventDefault();
+		var c = get_current_expires();
+		c.add(3,'months');
+		el_expires.val(c.format('YYYY-MM-DD'));
+	});
+	$('#plus1year').on('click', function(evt) {
+		evt.preventDefault();
+		var c = get_current_expires();
+		c.add(1,'years');
+		el_expires.val(c.format('YYYY-MM-DD'));
+	});
+});
 </script>
+{% endaddtoblock %}
+
 {% endblock macs_content %}
